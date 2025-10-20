@@ -1,0 +1,42 @@
+{
+  "name": "coderBOT",
+  "version": "1.0.0",
+  "description": "AI-powered Telegram conversation bot using Google Gemini",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc --outDir dist",
+    "dev": "nodemon --watch src --ext ts --exec \"tsc --outDir dist && node dist/src/app.js\"",
+    "start": "node ./dist/src/app.js",
+    "watch": "tsc --watch",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "pm2:start": "npm run build && pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop coderBOT",
+    "pm2:restart": "npm run build && pm2 restart coderBOT",
+    "pm2:delete": "pm2 delete coderBOT",
+    "pm2:logs": "pm2 logs coderBOT",
+    "pm2:monit": "pm2 monit",
+    "pm2:status": "pm2 status"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@types/archiver": "^6.0.3",
+    "@types/node": "^24.3.0",
+    "nodemon": "^3.1.10",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^2.0.11",
+    "@ai-sdk/openai": "^2.0.23",
+    "@google/genai": "^1.24.0",
+    "ai": "^5.0.30",
+    "archiver": "^7.0.1",
+    "dotenv": "^17.2.2",
+    "grammy": "^1.38.2",
+    "node-pty": "^1.0.0",
+    "puppeteer": "^24.25.0",
+    "zod": "^4.1.5"
+  }
+}

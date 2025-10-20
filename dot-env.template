@@ -1,0 +1,41 @@
+# Environment Variables
+
+# Your Telegram bot tokens from @BotFather, separated by commas
+# You can specify one or more tokens to run multiple bot instances
+# Example: TELEGRAM_BOT_TOKENS=1234567890:AABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPQQrrss,9876543210:ZZYYXXWWVVUUTTSSRRQQPPOONNMMllkkjjii
+
+# Comma-separated list of Telegram user IDs allowed to use the bot
+# Example: ALLOWED_USER_IDS=123456789,987654321
+ALLOWED_USER_IDS=
+
+# Auto-kill bot on unauthorized access (true/false)
+# If set to true, the bot will shutdown when an unknown user tries to access it
+# All allowed users will be notified before shutdown
+AUTO_KILL=true
+
+# Xterm/PTY Configuration
+# Maximum number of output lines to keep in buffer (default: 1000)
+XTERM_MAX_OUTPUT_LINES=1000
+
+# Session timeout in milliseconds (default: 1800000 = 30 minutes)
+# Set to a high value like 86400000 (24 hours) to keep sessions alive longer
+# Set to 315360000000 (10 years) to effectively disable timeout
+XTERM_SESSION_TIMEOUT=1800000
+
+# Terminal dimensions - rows (default: 50)
+XTERM_TERMINAL_ROWS=50
+
+# Terminal dimensions - columns (default: 100)
+XTERM_TERMINAL_COLS=100
+
+# Shell path for PTY sessions (default: /bin/bash)
+XTERM_SHELL_PATH=/bin/bash
+
+# Media folder to watch for files to send to users
+# Files will be sent and then moved to a 'sent' subfolder
+MEDIA_TMP_LOCATION=/tmp/coderBOT_media
+
+# Message auto-delete timeout in milliseconds (default: 10000 = 10 seconds)
+# Time to wait before automatically deleting confirmation messages
+# Set to 0 to disable auto-deletion of messages
+MESSAGE_DELETE_TIMEOUT=10000

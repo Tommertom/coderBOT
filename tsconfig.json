@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "module": "ES2020",
+    "esModuleInterop": true,
+    "target": "ES2020",
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "outDir": "dist",
+    "lib": ["ES2020", "dom"],
+    "types": ["node"],
+    "downlevelIteration": true,
+    "skipLibCheck": true
+  },
+  "exclude": ["scripts/**/*"]
+}

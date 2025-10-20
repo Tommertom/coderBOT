@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  coderbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: coderbot
+    restart: unless-stopped
+    
+    # Environment variables from .env file
+    env_file:
+      - .env
+    
+    # Volume mounts
+    volumes:
+      # Persist logs
+      - ./logs:/app/logs
+      # Media folder for file watching
+      - ./media:/media/bot_generated
+      # Optional: Persist terminal history
+      - terminal_history:/home/botuser
+      # Optional: Mount a working directory for file operations
+      - bot_workspace:/home/botuser/workspace
+      # Persist GitHub CLI authentication (for Copilot CLI)
+      - gh_config:/home/node/.config/gh
+    
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Uncomment for read-only root filesystem (advanced)
+    # read_only: true
+    # tmpfs:
+    #   - /tmp:size=200M,mode=1777
+    #   - /app/logs:size=100M
+    #   - /home/botuser:size=500M
+    
+    # Network configuration
+    network_mode: "bridge"
+    
+    # Health check (optional)
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  terminal_history:
+    driver: local
+  bot_workspace:
+    driver: local
+  gh_config:
+    driver: local
