@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: "coderBOT",
-      script: "./dist/src/app.js",
+      script: "./dist/app.js",
       instances: 1,
       autorestart: true,
       watch: false,
