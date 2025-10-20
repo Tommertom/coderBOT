@@ -138,6 +138,50 @@ npm run pm2:stop     # Stop the bot
 npm run pm2:status   # Check status
 ```
 
+### Prerequisites: Authenticating AI Coding Tools
+
+**Important:** Before you can use the AI coding assistants (`/copilot`, `/claude`, `/cursor`), you must first authenticate these tools on the server where the bot is running.
+
+**Required Authentication Steps:**
+
+1. **Run each AI tool manually in a terminal** on the server to complete their authentication flow:
+   ```bash
+   # GitHub Copilot CLI
+   github-copilot-cli auth
+   
+   # Claude CLI (Anthropic)
+   claude auth
+   
+   # Cursor CLI
+   cursor auth
+   ```
+
+2. **Authenticate Git and GitHub CLI** (required by most AI tools):
+   ```bash
+   # GitHub CLI authentication
+   gh auth login
+   
+   # Git configuration
+   git config --global user.name "Your Name"
+   git config --global user.email "your.email@example.com"
+   ```
+
+3. **Verify authentication** by running each tool:
+   ```bash
+   github-copilot-cli --version
+   claude --version
+   cursor --version
+   gh auth status
+   ```
+
+**Why This Is Needed:**
+- AI coding tools require API keys or OAuth authentication
+- Authentication tokens are stored in your system's configuration
+- The bot runs these tools as the system user, so they must be pre-authenticated
+- Each tool has its own authentication mechanism (GitHub account, API keys, etc.)
+
+**Note:** Authentication only needs to be done once per server. The credentials persist across bot restarts.
+
 ## Commands
 
 ### Session Management
