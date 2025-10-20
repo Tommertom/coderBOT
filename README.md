@@ -19,7 +19,11 @@ Create a `.env` file in the root directory with the following variables:
 
 ```env
 # Telegram Bot Configuration (Required)
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+# Single bot: provide one token
+# Multiple bots: provide comma-separated tokens (each bot runs independently with isolated sessions)
+# Example single: TELEGRAM_BOT_TOKENS=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+# Example multi: TELEGRAM_BOT_TOKENS=1234567890:ABCdefGHI,0987654321:XYZabcDEF
+TELEGRAM_BOT_TOKENS=your_telegram_bot_token_here
 
 # Access Control (Required)
 # Comma-separated list of Telegram User IDs allowed to use the bot
@@ -63,6 +67,33 @@ MESSAGE_DELETE_TIMEOUT=10000
 2. The bot will display your User ID in the response
 3. Add your User ID to `ALLOWED_USER_IDS` in `.env`
 4. Restart the bot
+
+### Running Multiple Bot Instances
+
+CoderBOT supports running multiple bot instances simultaneously using a single application instance. Each bot operates independently with its own isolated terminal sessions.
+
+**Use Cases:**
+- Run separate bots for different teams or projects
+- Provide development and production bot instances
+- Create specialized bots with different configurations
+
+**Configuration:**
+Simply provide multiple bot tokens separated by commas in `TELEGRAM_BOT_TOKENS`:
+
+```env
+TELEGRAM_BOT_TOKENS=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz,0987654321:XYZabcDEFghiJKLmnoPQRst
+```
+
+**Session Isolation:**
+- Each bot maintains completely independent terminal sessions
+- The same user can run separate sessions on different bots simultaneously
+- Sessions are keyed by bot ID and user ID, preventing any cross-contamination
+- All commands, file uploads, and screenshots are bot-specific
+
+**Example Workflow:**
+1. User starts `/copilot` on Bot 1 → Opens Copilot session on Bot 1
+2. User starts `/claude` on Bot 2 → Opens Claude session on Bot 2
+3. Both sessions run independently without interference
 
 ## Getting Started
 
