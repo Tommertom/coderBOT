@@ -1,13 +1,22 @@
 import * as pty from 'node-pty';
-import { PtySession, XtermConfig, DEFAULT_CONFIG } from './xterm.types.js';
+import { PtySession, XtermConfig } from './xterm.types.js';
+import { ConfigService } from '../../services/config.service.js';
 
 export class XtermService {
     private sessions: Map<string, PtySession> = new Map();
     private config: XtermConfig;
+    private configService: ConfigService;
     private timeoutCheckerInterval: NodeJS.Timeout | null = null;
 
-    constructor(config: Partial<XtermConfig> = {}) {
-        this.config = { ...DEFAULT_CONFIG, ...config };
+    constructor(configService: ConfigService) {
+        this.configService = configService;
+        this.config = {
+            maxOutputLines: configService.getXtermMaxOutputLines(),
+            sessionTimeout: configService.getXtermSessionTimeout(),
+            terminalRows: configService.getXtermTerminalRows(),
+            terminalCols: configService.getXtermTerminalCols(),
+            shellPath: configService.getXtermShellPath(),
+        };
         this.startTimeoutChecker();
     }
 
@@ -26,8 +35,8 @@ export class XtermService {
                 name: 'xterm-color',
                 cols: this.config.terminalCols,
                 rows: this.config.terminalRows,
-                cwd: process.env.HOME || '/tmp',
-                env: process.env as { [key: string]: string },
+                cwd: this.configService.getHomeDirectory(),
+                env: this.configService.getSystemEnv(),
             });
 
             const session: PtySession = {

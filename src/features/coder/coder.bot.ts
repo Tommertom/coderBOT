@@ -2,6 +2,7 @@ import { Bot, Context, InlineKeyboard, InputFile, Keyboard } from 'grammy';
 import { XtermService } from '../xterm/xterm.service.js';
 import { XtermRendererService } from '../xterm/xterm-renderer.service.js';
 import { CoderService } from './coder.service.js';
+import { ConfigService } from '../../services/config.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -10,22 +11,28 @@ import * as https from 'https';
 export class CoderBot {
     private bot: Bot | null = null;
     private botId: string;
+    private botToken: string;
     private mediaPath: string;
     private receivedPath: string;
     private xtermService: XtermService;
     private xtermRendererService: XtermRendererService;
     private coderService: CoderService;
+    private configService: ConfigService;
 
     constructor(
         botId: string,
+        botToken: string,
         xtermService: XtermService,
         xtermRendererService: XtermRendererService,
-        coderService: CoderService
+        coderService: CoderService,
+        configService: ConfigService
     ) {
         this.botId = botId;
+        this.botToken = botToken;
         this.xtermService = xtermService;
         this.xtermRendererService = xtermRendererService;
         this.coderService = coderService;
+        this.configService = configService;
         this.mediaPath = this.coderService.getMediaPath();
         this.receivedPath = this.coderService.getReceivedPath();
         this.ensureReceivedDirectory();
@@ -127,35 +134,23 @@ export class CoderBot {
         }
 
         try {
+            this.handleBellNotification(userId, chatId);
             const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
 
-            // Extract numbered options from the terminal output
+            // Check if the terminal output contains the confirmation trigger pattern
             const fullOutput = outputBuffer.join('');
-            const options: string[] = [];
 
-            // Match patterns like "1. Text" or "2, Text" followed by the option description
-            const optionRegex = /^\s*(\d+)[.,]\s+(.+?)$/gm;
-            let match;
-
-            while ((match = optionRegex.exec(fullOutput)) !== null) {
-                const number = match[1];
-                const description = match[2].trim();
-                if (number && description) {
-                    options.push(`/${number} - ${description}`);
-                }
+            if (!fullOutput.includes('> 1.')) {
+                // If the trigger pattern is not found, don't send notification
+                return;
             }
 
-            // Build message with extracted options or fallback to generic list
-            let message = '⚠️ Confirmation Required\n\nPlease select an option:';
-            if (options.length > 0) {
-                message += '\n' + options.join('\n');
-            } else {
-                message += '\n/1\t\t/2\t\t/3\t\t/4\t\t/5';
-            }
+            // Build message with generic option list
+            const message = '⚠️ Confirmation Required';
 
             const sentMsg = await this.bot.api.sendMessage(chatId, message);
 
-            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
             if (deleteTimeout > 0) {
                 setTimeout(async () => {
                     try {
@@ -167,33 +162,6 @@ export class CoderBot {
             }
         } catch (error) {
             console.error(`Failed to send confirmation notification: ${error}`);
-        }
-    }
-
-    private async handlePromptDetection(userId: string, chatId: number, data: string): Promise<void> {
-        if (!this.bot) {
-            console.error('Bot instance not available for prompt notification');
-            return;
-        }
-
-        try {
-            const sentMsg = await this.bot.api.sendMessage(
-                chatId, 
-                '✅ Prompt detected - terminal is waiting for input'
-            );
-
-            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await this.bot!.api.deleteMessage(chatId, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete prompt notification message:', error);
-                    }
-                }, deleteTimeout);
-            }
-        } catch (error) {
-            console.error(`Failed to send prompt notification: ${error}`);
         }
     }
 
@@ -318,8 +286,7 @@ export class CoderBot {
                 return;
             }
 
-            const token = process.env.TELEGRAM_BOT_TOKEN!;
-            const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+            const fileUrl = `https://api.telegram.org/file/bot${this.botToken}/${file.file_path}`;
 
             const timestamp = Date.now();
             const ext = path.extname(file.file_path) || '.jpg';
@@ -376,7 +343,7 @@ export class CoderBot {
 
             const sentMsg = await ctx.reply('✅ Sent - Use /screen to view the output or refresh any existing screen.');
 
-            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
             if (deleteTimeout > 0) {
                 setTimeout(async () => {
                     try {
@@ -405,7 +372,7 @@ export class CoderBot {
                     'Use /close to terminate it first, or continue using it.'
                 );
 
-                const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+                const deleteTimeout = this.configService.getMessageDeleteTimeout();
                 if (deleteTimeout > 0) {
                     setTimeout(async () => {
                         try {
@@ -418,43 +385,16 @@ export class CoderBot {
                 return;
             }
 
-            const message = ctx.message?.text || '';
-            const directory = message.replace('/copilot', '').trim();
-
-            if (directory) {
-                const sanitizedDir = directory.replace(/[;&|`$()]/g, '');
-                if (sanitizedDir !== directory) {
-                    await ctx.reply('❌ Invalid directory path. Special characters are not allowed.');
-                    return;
-                }
-
-                if (!fs.existsSync(sanitizedDir)) {
-                    await ctx.reply(`❌ Directory does not exist: ${sanitizedDir}`);
-                    return;
-                }
-
-                const stat = fs.statSync(sanitizedDir);
-                if (!stat.isDirectory()) {
-                    await ctx.reply(`❌ Path is not a directory: ${sanitizedDir}`);
-                    return;
-                }
-            }
-
             const dataHandler = this.coderService.createTerminalDataHandler({
                 onBell: this.handleBellNotification.bind(this),
                 onConfirmationPrompt: this.handleConfirmNotification.bind(this),
-                onPromptDetected: this.handlePromptDetection.bind(this),
             });
 
             this.xtermService.createSession(userId, chatId, dataHandler);
 
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            if (directory) {
-                this.xtermService.writeToSession(userId, `cd ${directory} && copilot`);
-            } else {
-                this.xtermService.writeToSession(userId, 'copilot');
-            }
+            this.xtermService.writeToSession(userId, 'copilot');
 
             await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -498,7 +438,7 @@ export class CoderBot {
                     'Use /close to terminate it first, or continue using it.'
                 );
 
-                const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+                const deleteTimeout = this.configService.getMessageDeleteTimeout();
                 if (deleteTimeout > 0) {
                     setTimeout(async () => {
                         try {
@@ -511,43 +451,16 @@ export class CoderBot {
                 return;
             }
 
-            const message = ctx.message?.text || '';
-            const directory = message.replace('/claude', '').trim();
-
-            if (directory) {
-                const sanitizedDir = directory.replace(/[;&|`$()]/g, '');
-                if (sanitizedDir !== directory) {
-                    await ctx.reply('❌ Invalid directory path. Special characters are not allowed.');
-                    return;
-                }
-
-                if (!fs.existsSync(sanitizedDir)) {
-                    await ctx.reply(`❌ Directory does not exist: ${sanitizedDir}`);
-                    return;
-                }
-
-                const stat = fs.statSync(sanitizedDir);
-                if (!stat.isDirectory()) {
-                    await ctx.reply(`❌ Path is not a directory: ${sanitizedDir}`);
-                    return;
-                }
-            }
-
             const dataHandler = this.coderService.createTerminalDataHandler({
                 onBell: this.handleBellNotification.bind(this),
                 onConfirmationPrompt: this.handleConfirmNotification.bind(this),
-                onPromptDetected: this.handlePromptDetection.bind(this),
             });
 
             this.xtermService.createSession(userId, chatId, dataHandler);
 
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            if (directory) {
-                this.xtermService.writeToSession(userId, `cd ${directory} && claude`);
-            } else {
-                this.xtermService.writeToSession(userId, 'claude');
-            }
+            this.xtermService.writeToSession(userId, 'claude');
 
             await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -591,7 +504,7 @@ export class CoderBot {
                     'Use /close to terminate it first, or continue using it.'
                 );
 
-                const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+                const deleteTimeout = this.configService.getMessageDeleteTimeout();
                 if (deleteTimeout > 0) {
                     setTimeout(async () => {
                         try {
@@ -604,43 +517,16 @@ export class CoderBot {
                 return;
             }
 
-            const message = ctx.message?.text || '';
-            const directory = message.replace('/cursor', '').trim();
-
-            if (directory) {
-                const sanitizedDir = directory.replace(/[;&|`$()]/g, '');
-                if (sanitizedDir !== directory) {
-                    await ctx.reply('❌ Invalid directory path. Special characters are not allowed.');
-                    return;
-                }
-
-                if (!fs.existsSync(sanitizedDir)) {
-                    await ctx.reply(`❌ Directory does not exist: ${sanitizedDir}`);
-                    return;
-                }
-
-                const stat = fs.statSync(sanitizedDir);
-                if (!stat.isDirectory()) {
-                    await ctx.reply(`❌ Path is not a directory: ${sanitizedDir}`);
-                    return;
-                }
-            }
-
             const dataHandler = this.coderService.createTerminalDataHandler({
                 onBell: this.handleBellNotification.bind(this),
                 onConfirmationPrompt: this.handleConfirmNotification.bind(this),
-                onPromptDetected: this.handlePromptDetection.bind(this),
             });
 
             this.xtermService.createSession(userId, chatId, dataHandler);
 
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            if (directory) {
-                this.xtermService.writeToSession(userId, `cd ${directory} && cursor`);
-            } else {
-                this.xtermService.writeToSession(userId, 'cursor');
-            }
+            this.xtermService.writeToSession(userId, 'cursor');
 
             await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -706,7 +592,7 @@ export class CoderBot {
 
             const sentMsg = await ctx.reply('✅ Sent - Use /screen to view the output or refresh any existing screen.');
 
-            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
             if (deleteTimeout > 0) {
                 setTimeout(async () => {
                     try {
@@ -737,6 +623,7 @@ export class CoderBot {
             }
 
             this.xtermService.closeSession(userId);
+            this.coderService.clearBuffer(userId, chatId);
 
             await ctx.reply(
                 '✅ *Coder Session Closed*\n\n' +
@@ -768,7 +655,7 @@ export class CoderBot {
             { parse_mode: 'Markdown' }
         );
 
-        const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+        const deleteTimeout = this.configService.getMessageDeleteTimeout();
         if (deleteTimeout > 0) {
             setTimeout(async () => {
                 try {
@@ -820,7 +707,7 @@ export class CoderBot {
             { parse_mode: 'Markdown' }
         );
 
-        const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+        const deleteTimeout = this.configService.getMessageDeleteTimeout();
         if (deleteTimeout > 0) {
             setTimeout(async () => {
                 try {

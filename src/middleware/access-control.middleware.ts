@@ -1,10 +1,16 @@
 import { Context, NextFunction, Bot } from 'grammy';
+import { ConfigService } from '../services/config.service.js';
 
 export class AccessControlMiddleware {
     private static allowedUserIds: Set<number> | null = null;
     private static adminUserId: number | null = null;
     private static bots: Bot[] = [];
     private static notifiedUsers: Set<number> = new Set();
+    private static configService: ConfigService | null = null;
+
+    static setConfigService(config: ConfigService): void {
+        AccessControlMiddleware.configService = config;
+    }
 
     static setBotInstances(bots: Bot[]): void {
         AccessControlMiddleware.bots = bots;
@@ -12,15 +18,12 @@ export class AccessControlMiddleware {
 
     private static initializeAllowedUsers(): Set<number> {
         if (AccessControlMiddleware.allowedUserIds === null) {
-            const allowedIds = process.env.ALLOWED_USER_IDS || '';
-            AccessControlMiddleware.allowedUserIds = new Set(
-                allowedIds
-                    .split(',')
-                    .map(id => id.trim())
-                    .filter(id => id.length > 0)
-                    .map(id => parseInt(id, 10))
-                    .filter(id => !isNaN(id))
-            );
+            if (!AccessControlMiddleware.configService) {
+                throw new Error('ConfigService not set in AccessControlMiddleware');
+            }
+
+            const allowedIds = AccessControlMiddleware.configService.getAllowedUserIds();
+            AccessControlMiddleware.allowedUserIds = new Set(allowedIds);
 
             // Set the first user as admin
             const firstUser = Array.from(AccessControlMiddleware.allowedUserIds)[0];
@@ -171,7 +174,9 @@ export class AccessControlMiddleware {
     }
 
     private static isAutoKillEnabled(): boolean {
-        const autoKill = process.env.AUTO_KILL?.toLowerCase();
-        return autoKill === 'true' || autoKill === '1';
+        if (!AccessControlMiddleware.configService) {
+            return false;
+        }
+        return AccessControlMiddleware.configService.isAutoKillEnabled();
     }
 }

@@ -3,13 +3,26 @@ import { XtermBot } from './features/xterm/xterm.bot.js';
 import { CoderBot } from './features/coder/coder.bot.js';
 import { ServiceContainerFactory } from './services/service-container.factory.js';
 import { ServiceContainer } from './services/service-container.interface.js';
-import { mediaWatcherService } from './features/media/media-watcher.service.js';
+import { createMediaWatcherService } from './features/media/media-watcher.service.js';
 import { AccessControlMiddleware } from './middleware/access-control.middleware.js';
+import { ConfigService } from './services/config.service.js';
 import dotenv from 'dotenv';
 
 console.log('Starting CoderBot...')
 
 dotenv.config();
+
+// Initialize global config service
+const globalConfig = new ConfigService();
+
+try {
+    globalConfig.validate();
+    console.log('Configuration loaded successfully');
+    console.log(globalConfig.getDebugInfo());
+} catch (error) {
+    console.error('Configuration error:', error);
+    process.exit(1);
+}
 
 interface BotInstance {
     bot: Bot;
@@ -18,17 +31,8 @@ interface BotInstance {
     coderBot: CoderBot;
 }
 
-// Parse comma-separated bot tokens
-const botTokens = (process.env.TELEGRAM_BOT_TOKENS || '')
-    .split(',')
-    .map(token => token.trim())
-    .filter(token => token.length > 0);
-
-if (botTokens.length === 0) {
-    console.error('Error: No bot tokens found in TELEGRAM_BOT_TOKENS environment variable');
-    console.error('Please set TELEGRAM_BOT_TOKENS with one or more comma-separated tokens');
-    process.exit(1);
-}
+// Get bot tokens from config
+const botTokens = globalConfig.getTelegramBotTokens();
 
 console.log(`Found ${botTokens.length} bot token(s)`);
 
@@ -40,8 +44,14 @@ const bots: Bot[] = botTokens.map((token, index) => {
 
 const botInstances: BotInstance[] = [];
 
+// Initialize media watcher service with config
+const mediaWatcherService = createMediaWatcherService(globalConfig);
+
 async function startBot() {
     try {
+        // Set config service for access control
+        AccessControlMiddleware.setConfigService(globalConfig);
+
         // Set bot instances for access control
         AccessControlMiddleware.setBotInstances(bots);
 
@@ -51,6 +61,7 @@ async function startBot() {
         // Initialize each bot
         for (let i = 0; i < bots.length; i++) {
             const bot = bots[i];
+            const token = botTokens[i];
             console.log(`Initializing bot ${i + 1}/${bots.length}...`);
 
             // Set global error handler to prevent crashes
@@ -70,13 +81,16 @@ async function startBot() {
             const xtermBot = new XtermBot(
                 botId,
                 services.xtermService,
-                services.xtermRendererService
+                services.xtermRendererService,
+                services.configService
             );
             const coderBot = new CoderBot(
                 botId,
+                token,
                 services.xtermService,
                 services.xtermRendererService,
-                services.coderService
+                services.coderService,
+                services.configService
             );
 
             // Store bot instance with its services
@@ -117,7 +131,7 @@ async function startBot() {
 process.on('SIGINT', async () => {
     console.log('Received SIGINT, shutting down gracefully...');
     mediaWatcherService.cleanup();
-    
+
     // Cleanup each bot's services independently
     await Promise.all(
         botInstances.map(async (instance) => {
@@ -125,14 +139,14 @@ process.on('SIGINT', async () => {
             await instance.bot.stop();
         })
     );
-    
+
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
     console.log('Received SIGTERM, shutting down gracefully...');
     mediaWatcherService.cleanup();
-    
+
     // Cleanup each bot's services independently
     await Promise.all(
         botInstances.map(async (instance) => {
@@ -140,7 +154,7 @@ process.on('SIGTERM', async () => {
             await instance.bot.stop();
         })
     );
-    
+
     process.exit(0);
 });
 

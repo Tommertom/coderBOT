@@ -2,14 +2,24 @@ import { ServiceContainer } from './service-container.interface.js';
 import { XtermService } from '../features/xterm/xterm.service.js';
 import { XtermRendererService } from '../features/xterm/xterm-renderer.service.js';
 import { CoderService } from '../features/coder/coder.service.js';
+import { ConfigService } from './config.service.js';
 
 export class ServiceContainerFactory {
+    private static globalConfig: ConfigService | null = null;
+
     static create(botId: string): ServiceContainer {
-        const xtermService = new XtermService();
+        // Create or reuse the global config service (shared across all bots)
+        if (!ServiceContainerFactory.globalConfig) {
+            ServiceContainerFactory.globalConfig = new ConfigService();
+        }
+        const configService = ServiceContainerFactory.globalConfig;
+
+        const xtermService = new XtermService(configService);
         const xtermRendererService = new XtermRendererService();
-        const coderService = new CoderService();
+        const coderService = new CoderService(configService);
 
         return {
+            configService,
             xtermService,
             xtermRendererService,
             coderService,
@@ -18,5 +28,12 @@ export class ServiceContainerFactory {
                 await xtermRendererService.cleanup();
             }
         };
+    }
+
+    static getGlobalConfig(): ConfigService {
+        if (!ServiceContainerFactory.globalConfig) {
+            ServiceContainerFactory.globalConfig = new ConfigService();
+        }
+        return ServiceContainerFactory.globalConfig;
     }
 }

@@ -1,6 +1,7 @@
 import { Bot, Context, InputFile, InlineKeyboard } from 'grammy';
 import { XtermService } from './xterm.service.js';
 import { XtermRendererService } from './xterm-renderer.service.js';
+import { ConfigService } from '../../services/config.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
 
 export class XtermBot {
@@ -8,6 +9,7 @@ export class XtermBot {
     private botId: string;
     private xtermService: XtermService;
     private xtermRendererService: XtermRendererService;
+    private configService: ConfigService;
 
     private readonly CTRL_MAPPINGS: Record<string, string> = {
         '@': '\x00',
@@ -48,11 +50,13 @@ export class XtermBot {
     constructor(
         botId: string,
         xtermService: XtermService,
-        xtermRendererService: XtermRendererService
+        xtermRendererService: XtermRendererService,
+        configService: ConfigService
     ) {
         this.botId = botId;
         this.xtermService = xtermService;
         this.xtermRendererService = xtermRendererService;
+        this.configService = configService;
     }
 
     registerHandlers(bot: Bot): void {
@@ -89,7 +93,7 @@ export class XtermBot {
 
             const sentMsg = await ctx.reply(`✅ Sent: ${number}`);
 
-            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
             if (deleteTimeout > 0) {
                 setTimeout(async () => {
                     try {
@@ -159,7 +163,7 @@ export class XtermBot {
                 `✅ Sent Ctrl+${charDisplay.toUpperCase()}\n\nUse /screen to view the output or refresh any existing screen.`
             );
 
-            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
             if (deleteTimeout > 0) {
                 setTimeout(async () => {
                     try {
@@ -271,7 +275,7 @@ export class XtermBot {
 
             const sentMsg = await ctx.reply('✅ Sent Tab character\n\nUse /screen to view the output or refresh any existing screen.');
 
-            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
             if (deleteTimeout > 0) {
                 setTimeout(async () => {
                     try {
@@ -303,7 +307,7 @@ export class XtermBot {
 
             const sentMsg = await ctx.reply('✅ Sent Enter key\n\nUse /screen to view the output or refresh any existing screen.');
 
-            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
             if (deleteTimeout > 0) {
                 setTimeout(async () => {
                     try {
@@ -335,7 +339,7 @@ export class XtermBot {
 
             const sentMsg = await ctx.reply('✅ Sent Space character\n\nUse /screen to view the output or refresh any existing screen.');
 
-            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
             if (deleteTimeout > 0) {
                 setTimeout(async () => {
                     try {
@@ -367,7 +371,7 @@ export class XtermBot {
 
             const sentMsg = await ctx.reply('✅ Sent Delete key\n\nUse /screen to view the output or refresh any existing screen.');
 
-            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
             if (deleteTimeout > 0) {
                 setTimeout(async () => {
                     try {
@@ -399,7 +403,7 @@ export class XtermBot {
 
             const sentMsg = await ctx.reply('✅ Sent Ctrl+C - Use /screen to view the output or refresh any existing screen.');
 
-            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
             if (deleteTimeout > 0) {
                 setTimeout(async () => {
                     try {
@@ -431,7 +435,7 @@ export class XtermBot {
 
             const sentMsg = await ctx.reply('✅ Sent Ctrl+X - Use /screen to view the output or refresh any existing screen.');
 
-            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
             if (deleteTimeout > 0) {
                 setTimeout(async () => {
                     try {
@@ -463,7 +467,7 @@ export class XtermBot {
 
             const sentMsg = await ctx.reply('✅ Sent Escape key - Use /screen to view the output or refresh any existing screen.');
 
-            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
             if (deleteTimeout > 0) {
                 setTimeout(async () => {
                     try {

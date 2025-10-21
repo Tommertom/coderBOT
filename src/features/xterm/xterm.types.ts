@@ -25,11 +25,3 @@ export interface XtermConfig {
     terminalCols: number;
     shellPath: string;
 }
-
-export const DEFAULT_CONFIG: XtermConfig = {
-    maxOutputLines: parseInt(process.env.XTERM_MAX_OUTPUT_LINES || '1000'),
-    sessionTimeout: parseInt(process.env.XTERM_SESSION_TIMEOUT || '1800000'),
-    terminalRows: parseInt(process.env.XTERM_TERMINAL_ROWS || '50'),
-    terminalCols: parseInt(process.env.XTERM_TERMINAL_COLS || '100'),
-    shellPath: process.env.XTERM_SHELL_PATH || '/bin/bash',
-};

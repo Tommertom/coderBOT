@@ -1,9 +1,11 @@
 import { Bot, InputFile } from 'grammy';
+import { ConfigService } from '../../services/config.service.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
 export class MediaWatcherService {
     private bots: Bot[] = [];
+    private configService: ConfigService;
     private watchPath: string;
     private sentPath: string;
     private receivedPath: string;
@@ -11,8 +13,9 @@ export class MediaWatcherService {
     private allowedUserIds: number[] = [];
     private processingFiles: Set<string> = new Set();
 
-    constructor() {
-        this.watchPath = process.env.MEDIA_TMP_LOCATION || '/tmp/coderBOT_media';
+    constructor(configService: ConfigService) {
+        this.configService = configService;
+        this.watchPath = configService.getMediaTmpLocation();
         this.sentPath = path.join(this.watchPath, 'sent');
         this.receivedPath = path.join(this.watchPath, 'received');
     }
@@ -20,13 +23,8 @@ export class MediaWatcherService {
     async initialize(bots: Bot[]): Promise<void> {
         this.bots = bots;
 
-        // Load allowed user IDs from environment (must be done after dotenv.config())
-        const allowedIds = process.env.ALLOWED_USER_IDS || '';
-        this.allowedUserIds = allowedIds
-            .split(',')
-            .map(id => id.trim())
-            .filter(id => id)
-            .map(id => parseInt(id, 10));
+        // Load allowed user IDs from config service
+        this.allowedUserIds = this.configService.getAllowedUserIds();
 
         console.log(`Media watcher configured for ${this.allowedUserIds.length} user(s): ${this.allowedUserIds.join(', ')}`);
 
@@ -220,4 +218,7 @@ export class MediaWatcherService {
     }
 }
 
-export const mediaWatcherService = new MediaWatcherService();
+// Export a function to create the service with config
+export function createMediaWatcherService(configService: ConfigService): MediaWatcherService {
+    return new MediaWatcherService(configService);
+}
