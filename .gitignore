@@ -75,3 +75,5 @@ secrets/
 *.key
 *.pem
 *.cert
+
+core
