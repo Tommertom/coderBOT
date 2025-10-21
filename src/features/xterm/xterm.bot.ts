@@ -3,6 +3,9 @@ import { XtermService } from './xterm.service.js';
 import { XtermRendererService } from './xterm-renderer.service.js';
 import { ConfigService } from '../../services/config.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
+import { MessageUtils } from '../../utils/message.utils.js';
+import { ErrorUtils } from '../../utils/error.utils.js';
+import { Messages, SuccessMessages, ErrorActions } from '../../constants/messages.js';
 
 export class XtermBot {
     private bot: Bot | null = null;
@@ -79,106 +82,85 @@ export class XtermBot {
         bot.command('5', AccessControlMiddleware.requireAccess, this.handleNumberKey.bind(this, '5'));
     }
 
+    /**
+     * Helper method to require an active session before executing handler logic
+     */
+    private async requireActiveSession(
+        ctx: Context,
+        userId: string,
+        action: () => Promise<void>
+    ): Promise<void> {
+        if (!this.xtermService.hasSession(userId)) {
+            await ctx.reply(Messages.NO_ACTIVE_SESSION);
+            return;
+        }
+        await action();
+    }
+
     private async handleNumberKey(number: string, ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
 
-        try {
-            if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply('❌ No active session.\n\nUse /start to create one.');
-                return;
+        await this.requireActiveSession(ctx, userId, async () => {
+            try {
+                this.xtermService.writeRawToSession(userId, number);
+                const sentMsg = await ctx.reply(SuccessMessages.SENT(number));
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+            } catch (error) {
+                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_KEY, error));
             }
-
-            this.xtermService.writeRawToSession(userId, number);
-
-            const sentMsg = await ctx.reply(`✅ Sent: ${number}`);
-
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete message:', error);
-                    }
-                }, deleteTimeout);
-            }
-        } catch (error) {
-            await ctx.reply(
-                '❌ Failed to send key.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        });
     }
 
     private async handleCtrl(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
 
-        try {
-            if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply('❌ No active session.\n\nUse /start to create one.');
-                return;
+        await this.requireActiveSession(ctx, userId, async () => {
+            try {
+                const message = ctx.message?.text || '';
+                const char = message.replace('/ctrl', '').trim().toLowerCase();
+
+                if (!char || char.length !== 1) {
+                    const availableKeys = Object.keys(this.CTRL_MAPPINGS).sort().join(', ');
+                    await ctx.reply(
+                        '⚠️ Please provide exactly one character.\n\n' +
+                        '*Usage:* `/ctrl <character>`\n' +
+                        '*Example:* `/ctrl c` (sends Ctrl+C)\n\n' +
+                        `*Available characters:*\n\`${availableKeys}\`\n\n` +
+                        '*Common mappings:*\n' +
+                        '• `@` - Ctrl+@ (NUL)\n' +
+                        '• `a-z` - Ctrl+A through Ctrl+Z\n' +
+                        '• `[` - Ctrl+[ (Escape)\n' +
+                        '• `\\` - Ctrl+\\\n' +
+                        '• `]` - Ctrl+]\n' +
+                        '• `^` - Ctrl+^\n' +
+                        '• `_` - Ctrl+_\n' +
+                        '• `?` - Ctrl+? (Delete)',
+                        { parse_mode: 'Markdown' }
+                    );
+                    return;
+                }
+
+                const controlCode = this.CTRL_MAPPINGS[char];
+                if (!controlCode) {
+                    const availableKeys = Object.keys(this.CTRL_MAPPINGS).sort().join(', ');
+                    await ctx.reply(
+                        `❌ Invalid control character: \`${char}\`\n\n` +
+                        `*Available characters:* \`${availableKeys}\``,
+                        { parse_mode: 'Markdown' }
+                    );
+                    return;
+                }
+
+                this.xtermService.writeRawToSession(userId, controlCode);
+
+                const charDisplay = char === '\\' ? '\\\\' : char;
+                const sentMsg = await ctx.reply(SuccessMessages.SENT_CONTROL_KEY(charDisplay.toUpperCase()));
+
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+            } catch (error) {
+                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_CONTROL_CHARACTER, error));
             }
-
-            const message = ctx.message?.text || '';
-            const char = message.replace('/ctrl', '').trim().toLowerCase();
-
-            if (!char || char.length !== 1) {
-                const availableKeys = Object.keys(this.CTRL_MAPPINGS).sort().join(', ');
-                await ctx.reply(
-                    '⚠️ Please provide exactly one character.\n\n' +
-                    '*Usage:* `/ctrl <character>`\n' +
-                    '*Example:* `/ctrl c` (sends Ctrl+C)\n\n' +
-                    `*Available characters:*\n\`${availableKeys}\`\n\n` +
-                    '*Common mappings:*\n' +
-                    '• `@` - Ctrl+@ (NUL)\n' +
-                    '• `a-z` - Ctrl+A through Ctrl+Z\n' +
-                    '• `[` - Ctrl+[ (Escape)\n' +
-                    '• `\\` - Ctrl+\\\n' +
-                    '• `]` - Ctrl+]\n' +
-                    '• `^` - Ctrl+^\n' +
-                    '• `_` - Ctrl+_\n' +
-                    '• `?` - Ctrl+? (Delete)',
-                    { parse_mode: 'Markdown' }
-                );
-                return;
-            }
-
-            const controlCode = this.CTRL_MAPPINGS[char];
-            if (!controlCode) {
-                const availableKeys = Object.keys(this.CTRL_MAPPINGS).sort().join(', ');
-                await ctx.reply(
-                    `❌ Invalid control character: \`${char}\`\n\n` +
-                    `*Available characters:* \`${availableKeys}\``,
-                    { parse_mode: 'Markdown' }
-                );
-                return;
-            }
-
-            this.xtermService.writeRawToSession(userId, controlCode);
-
-            const charDisplay = char === '\\' ? '\\\\' : char;
-            const sentMsg = await ctx.reply(
-                `✅ Sent Ctrl+${charDisplay.toUpperCase()}\n\nUse /screen to view the output or refresh any existing screen.`
-            );
-
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete message:', error);
-                    }
-                }, deleteTimeout);
-            }
-        } catch (error) {
-            await ctx.reply(
-                '❌ Failed to send control character.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        });
     }
 
     private async handleXterm(ctx: Context): Promise<void> {
@@ -187,10 +169,7 @@ export class XtermBot {
 
         try {
             if (this.xtermService.hasSession(userId)) {
-                await ctx.reply(
-                    '⚠️ You already have an active terminal session.\n\n' +
-                    'Use /close to terminate it first, or continue using it.'
-                );
+                await ctx.reply(Messages.SESSION_ALREADY_EXISTS);
                 return;
             }
 
@@ -219,308 +198,165 @@ export class XtermBot {
                 { parse_mode: 'Markdown' }
             );
         } catch (error) {
-            await ctx.reply(
-                '❌ Failed to create terminal session.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
+            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.CREATE_TERMINAL, error));
         }
     }
 
     private async handleKeys(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
 
-        try {
-            if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply('❌ No active session.\n\nUse /start to create one.');
-                return;
+        await this.requireActiveSession(ctx, userId, async () => {
+            try {
+                const message = ctx.message?.text || '';
+                const keys = message.replace('/keys', '').trim();
+
+                if (!keys) {
+                    await ctx.reply(
+                        '⚠️ Please provide keys to send.\n\n' +
+                        '*Usage:* `/keys <text>`\n' +
+                        '*Example:* `/keys hello`\n\n' +
+                        'Sends keys without pressing Enter.',
+                        { parse_mode: 'Markdown' }
+                    );
+                    return;
+                }
+
+                this.xtermService.writeRawToSession(userId, keys);
+
+                await ctx.reply(`✅ Sent keys: \`${keys}\`\n\n${Messages.VIEW_SCREEN_HINT}`, { parse_mode: 'Markdown' });
+            } catch (error) {
+                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_KEYS, error));
             }
-
-            const message = ctx.message?.text || '';
-            const keys = message.replace('/keys', '').trim();
-
-            if (!keys) {
-                await ctx.reply(
-                    '⚠️ Please provide keys to send.\n\n' +
-                    '*Usage:* `/keys <text>`\n' +
-                    '*Example:* `/keys hello`\n\n' +
-                    'Sends keys without pressing Enter.',
-                    { parse_mode: 'Markdown' }
-                );
-                return;
-            }
-
-            this.xtermService.writeRawToSession(userId, keys);
-
-            await ctx.reply(`✅ Sent keys: \`${keys}\`\n\nUse /screen to view the output or refresh any existing screen.`, { parse_mode: 'Markdown' });
-        } catch (error) {
-            await ctx.reply(
-                '❌ Failed to send keys.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        });
     }
 
     private async handleTab(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
 
-        try {
-            if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply('❌ No active session.\n\nUse /start to create one. Or type /help for assistance.');
-                return;
+        await this.requireActiveSession(ctx, userId, async () => {
+            try {
+                this.xtermService.writeRawToSession(userId, '\t');
+                const sentMsg = await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY('Tab character'));
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+            } catch (error) {
+                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TAB, error));
             }
-
-            this.xtermService.writeRawToSession(userId, '\t');
-
-            const sentMsg = await ctx.reply('✅ Sent Tab character\n\nUse /screen to view the output or refresh any existing screen.');
-
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete message:', error);
-                    }
-                }, deleteTimeout);
-            }
-        } catch (error) {
-            await ctx.reply(
-                '❌ Failed to send Tab.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        });
     }
 
     private async handleEnter(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
 
-        try {
-            if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply('❌ No active session.\n\nUse /start to create one.');
-                return;
+        await this.requireActiveSession(ctx, userId, async () => {
+            try {
+                this.xtermService.writeRawToSession(userId, '\r');
+                const sentMsg = await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY('Enter key'));
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+            } catch (error) {
+                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_ENTER, error));
             }
-
-            this.xtermService.writeRawToSession(userId, '\r');
-
-            const sentMsg = await ctx.reply('✅ Sent Enter key\n\nUse /screen to view the output or refresh any existing screen.');
-
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete message:', error);
-                    }
-                }, deleteTimeout);
-            }
-        } catch (error) {
-            await ctx.reply(
-                '❌ Failed to send Enter.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        });
     }
 
     private async handleSpace(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
 
-        try {
-            if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply('❌ No active session.\n\nUse /start to create one.');
-                return;
+        await this.requireActiveSession(ctx, userId, async () => {
+            try {
+                this.xtermService.writeRawToSession(userId, ' ');
+                const sentMsg = await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY('Space character'));
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+            } catch (error) {
+                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_SPACE, error));
             }
-
-            this.xtermService.writeRawToSession(userId, ' ');
-
-            const sentMsg = await ctx.reply('✅ Sent Space character\n\nUse /screen to view the output or refresh any existing screen.');
-
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete message:', error);
-                    }
-                }, deleteTimeout);
-            }
-        } catch (error) {
-            await ctx.reply(
-                '❌ Failed to send Space.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        });
     }
 
     private async handleDelete(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
 
-        try {
-            if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply('❌ No active session.\n\nUse /start to create one.');
-                return;
+        await this.requireActiveSession(ctx, userId, async () => {
+            try {
+                this.xtermService.writeRawToSession(userId, '\x7f');
+                const sentMsg = await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY('Delete key'));
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+            } catch (error) {
+                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_DELETE, error));
             }
-
-            this.xtermService.writeRawToSession(userId, '\x7f');
-
-            const sentMsg = await ctx.reply('✅ Sent Delete key\n\nUse /screen to view the output or refresh any existing screen.');
-
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete message:', error);
-                    }
-                }, deleteTimeout);
-            }
-        } catch (error) {
-            await ctx.reply(
-                '❌ Failed to send Delete key.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        });
     }
 
     private async handleCtrlC(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
 
-        try {
-            if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply('❌ No active session.\n\nUse /start to create one.');
-                return;
+        await this.requireActiveSession(ctx, userId, async () => {
+            try {
+                this.xtermService.writeRawToSession(userId, '\x03');
+                const sentMsg = await ctx.reply(SuccessMessages.SENT_CONTROL_KEY('C'));
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+            } catch (error) {
+                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_CTRL_C, error));
             }
-
-            this.xtermService.writeRawToSession(userId, '\x03');
-
-            const sentMsg = await ctx.reply('✅ Sent Ctrl+C - Use /screen to view the output or refresh any existing screen.');
-
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete message:', error);
-                    }
-                }, deleteTimeout);
-            }
-        } catch (error) {
-            await ctx.reply(
-                '❌ Failed to send Ctrl+C.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        });
     }
 
     private async handleCtrlX(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
 
-        try {
-            if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply('❌ No active session.\n\nUse /start to create one.');
-                return;
+        await this.requireActiveSession(ctx, userId, async () => {
+            try {
+                this.xtermService.writeRawToSession(userId, '\x18');
+                const sentMsg = await ctx.reply(SuccessMessages.SENT_CONTROL_KEY('X'));
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+            } catch (error) {
+                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_CTRL_X, error));
             }
-
-            this.xtermService.writeRawToSession(userId, '\x18');
-
-            const sentMsg = await ctx.reply('✅ Sent Ctrl+X - Use /screen to view the output or refresh any existing screen.');
-
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete message:', error);
-                    }
-                }, deleteTimeout);
-            }
-        } catch (error) {
-            await ctx.reply(
-                '❌ Failed to send Ctrl+X.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        });
     }
 
     private async handleEsc(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
 
-        try {
-            if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply('❌ No active session.\n\nUse /start to create one.');
-                return;
+        await this.requireActiveSession(ctx, userId, async () => {
+            try {
+                this.xtermService.writeRawToSession(userId, '\x1b');
+                const sentMsg = await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY('Escape key'));
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+            } catch (error) {
+                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_ESCAPE, error));
             }
-
-            this.xtermService.writeRawToSession(userId, '\x1b');
-
-            const sentMsg = await ctx.reply('✅ Sent Escape key - Use /screen to view the output or refresh any existing screen.');
-
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete message:', error);
-                    }
-                }, deleteTimeout);
-            }
-        } catch (error) {
-            await ctx.reply(
-                '❌ Failed to send Escape key.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        });
     }
 
     private async handleScreen(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
 
-        try {
-            if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply('❌ No active session.\n\nUse /start to create one.');
-                return;
+        await this.requireActiveSession(ctx, userId, async () => {
+            try {
+                const statusMsg = await ctx.reply(Messages.CAPTURING_SCREEN);
+
+                const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
+                const dimensions = this.xtermService.getSessionDimensions(userId);
+
+                const imageBuffer = await this.xtermRendererService.renderToImage(
+                    outputBuffer,
+                    dimensions.rows,
+                    dimensions.cols
+                );
+
+                await ctx.api.deleteMessage(ctx.chat!.id, statusMsg.message_id);
+
+                const keyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
+
+                const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
+                    reply_markup: keyboard,
+                });
+
+                // Store the message ID for future updates
+                this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
+            } catch (error) {
+                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.CAPTURE_SCREEN, error));
             }
-
-            const statusMsg = await ctx.reply('📸 Capturing terminal screen...');
-
-            const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
-            const dimensions = this.xtermService.getSessionDimensions(userId);
-
-            const imageBuffer = await this.xtermRendererService.renderToImage(
-                outputBuffer,
-                dimensions.rows,
-                dimensions.cols
-            );
-
-            await ctx.api.deleteMessage(ctx.chat!.id, statusMsg.message_id);
-
-            const keyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
-
-            const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
-                reply_markup: keyboard,
-            });
-
-            // Store the message ID for future updates
-            this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
-        } catch (error) {
-            await ctx.reply(
-                '❌ Failed to capture terminal screen.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        });
     }
 }

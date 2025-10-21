@@ -127,9 +127,11 @@ async function startBot() {
     }
 }
 
-// Handle graceful shutdown
-process.on('SIGINT', async () => {
-    console.log('Received SIGINT, shutting down gracefully...');
+/**
+ * Graceful shutdown handler for cleanup on process termination
+ */
+async function gracefulShutdown(signal: string): Promise<void> {
+    console.log(`Received ${signal}, shutting down gracefully...`);
     mediaWatcherService.cleanup();
 
     // Cleanup each bot's services independently
@@ -141,22 +143,11 @@ process.on('SIGINT', async () => {
     );
 
     process.exit(0);
-});
+}
 
-process.on('SIGTERM', async () => {
-    console.log('Received SIGTERM, shutting down gracefully...');
-    mediaWatcherService.cleanup();
-
-    // Cleanup each bot's services independently
-    await Promise.all(
-        botInstances.map(async (instance) => {
-            await instance.services.cleanup();
-            await instance.bot.stop();
-        })
-    );
-
-    process.exit(0);
-});
+// Handle graceful shutdown for both SIGINT and SIGTERM
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {

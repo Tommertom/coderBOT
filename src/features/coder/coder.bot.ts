@@ -4,6 +4,9 @@ import { XtermRendererService } from '../xterm/xterm-renderer.service.js';
 import { CoderService } from './coder.service.js';
 import { ConfigService } from '../../services/config.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
+import { MessageUtils } from '../../utils/message.utils.js';
+import { ErrorUtils } from '../../utils/error.utils.js';
+import { Messages, SuccessMessages, ErrorActions } from '../../constants/messages.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
@@ -169,11 +172,7 @@ export class CoderBot {
         const callbackData = ctx.callbackQuery?.data;
 
         if (!callbackData) {
-            try {
-                await ctx.answerCallbackQuery({ text: '❌ Invalid callback' });
-            } catch (e) {
-                console.error('Failed to answer callback query:', e);
-            }
+            await this.safeAnswerCallbackQuery(ctx, Messages.INVALID_CALLBACK);
             return;
         }
 
@@ -184,19 +183,11 @@ export class CoderBot {
         try {
             if (callbackData === 'refresh_screen') {
                 if (!this.xtermService.hasSession(userId)) {
-                    try {
-                        await ctx.answerCallbackQuery({ text: '❌ No active terminal session' });
-                    } catch (e) {
-                        console.error('Failed to answer callback query:', e);
-                    }
+                    await this.safeAnswerCallbackQuery(ctx, Messages.NO_ACTIVE_TERMINAL_SESSION);
                     return;
                 }
 
-                try {
-                    await ctx.answerCallbackQuery({ text: '🔄 Refreshing...' });
-                } catch (e) {
-                    console.error('Failed to answer callback query:', e);
-                }
+                await this.safeAnswerCallbackQuery(ctx, Messages.REFRESHING);
 
                 const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
                 const dimensions = this.xtermService.getSessionDimensions(userId);
@@ -221,30 +212,18 @@ export class CoderBot {
             }
 
             if (!this.xtermService.hasSession(userId)) {
-                try {
-                    await ctx.answerCallbackQuery({ text: '❌ No active terminal session' });
-                } catch (e) {
-                    console.error('Failed to answer callback query:', e);
-                }
+                await this.safeAnswerCallbackQuery(ctx, Messages.NO_ACTIVE_TERMINAL_SESSION);
                 return;
             }
 
             if (callbackData.match(/^\/[1-5]$/)) {
                 const number = callbackData.substring(1);
                 this.xtermService.writeRawToSession(userId, number);
-                try {
-                    await ctx.answerCallbackQuery({ text: `✅ Sent: ${number}` });
-                } catch (e) {
-                    console.error('Failed to answer callback query:', e);
-                }
+                await this.safeAnswerCallbackQuery(ctx, SuccessMessages.SENT(number));
             } else if (callbackData.startsWith('/')) {
                 const command = callbackData.substring(1);
                 this.xtermService.writeToSession(userId, command);
-                try {
-                    await ctx.answerCallbackQuery({ text: `✅ Executed: /${command}` });
-                } catch (e) {
-                    console.error('Failed to answer callback query:', e);
-                }
+                await this.safeAnswerCallbackQuery(ctx, `✅ Executed: /${command}`);
             } else {
                 try {
                     await ctx.answerCallbackQuery({ text: '❌ Unknown option' });
@@ -329,7 +308,7 @@ export class CoderBot {
 
         try {
             if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply('❌ No active session.\n\nUse /start to create one.');
+                await ctx.reply(Messages.NO_ACTIVE_SESSION);
                 return;
             }
 
@@ -341,222 +320,93 @@ export class CoderBot {
 
             this.xtermService.writeRawToSession(userId, '\r');
 
-            const sentMsg = await ctx.reply('✅ Sent - Use /screen to view the output or refresh any existing screen.');
+            const sentMsg = await ctx.reply(`✅ Sent - ${Messages.VIEW_SCREEN_HINT}`);
 
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete message:', error);
-                    }
-                }, deleteTimeout);
-            }
+            await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
         } catch (error) {
-            await ctx.reply(
-                '❌ Failed to send to terminal.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
+            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
+        }
+    }
+
+    /**
+     * Helper method to safely answer callback queries with error handling
+     */
+    private async safeAnswerCallbackQuery(ctx: Context, text: string): Promise<void> {
+        try {
+            await ctx.answerCallbackQuery({ text });
+        } catch (error) {
+            console.error('Failed to answer callback query:', error);
+        }
+    }
+
+    /**
+     * Helper method to send terminal screenshot with inline keyboard
+     */
+    private async sendSessionScreenshot(ctx: Context, userId: string): Promise<void> {
+        const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
+        const dimensions = this.xtermService.getSessionDimensions(userId);
+
+        const imageBuffer = await this.xtermRendererService.renderToImage(
+            outputBuffer,
+            dimensions.rows,
+            dimensions.cols
+        );
+
+        const inlineKeyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
+
+        const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
+            reply_markup: inlineKeyboard,
+        });
+
+        this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
+    }
+
+    /**
+     * Generic handler for AI assistant commands (copilot, claude, cursor)
+     */
+    private async handleAIAssistant(
+        ctx: Context,
+        assistantType: 'copilot' | 'claude' | 'cursor'
+    ): Promise<void> {
+        const userId = ctx.from!.id.toString();
+        const chatId = ctx.chat!.id;
+
+        try {
+            if (this.xtermService.hasSession(userId)) {
+                const sentMsg = await ctx.reply(Messages.SESSION_ALREADY_EXISTS);
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+                return;
+            }
+
+            const dataHandler = this.coderService.createTerminalDataHandler({
+                onBell: this.handleBellNotification.bind(this),
+                onConfirmationPrompt: this.handleConfirmNotification.bind(this),
+            });
+
+            this.xtermService.createSession(userId, chatId, dataHandler);
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            this.xtermService.writeToSession(userId, assistantType);
+
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            await this.sendSessionScreenshot(ctx, userId);
+        } catch (error) {
+            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.START_TERMINAL, error));
         }
     }
 
     private async handleCopilot(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
-
-        try {
-            if (this.xtermService.hasSession(userId)) {
-                const sentMsg = await ctx.reply(
-                    '⚠️ You already have an active terminal session.\n\n' +
-                    'Use /close to terminate it first, or continue using it.'
-                );
-
-                const deleteTimeout = this.configService.getMessageDeleteTimeout();
-                if (deleteTimeout > 0) {
-                    setTimeout(async () => {
-                        try {
-                            await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                        } catch (error) {
-                            console.error('Failed to delete active session message:', error);
-                        }
-                    }, deleteTimeout);
-                }
-                return;
-            }
-
-            const dataHandler = this.coderService.createTerminalDataHandler({
-                onBell: this.handleBellNotification.bind(this),
-                onConfirmationPrompt: this.handleConfirmNotification.bind(this),
-            });
-
-            this.xtermService.createSession(userId, chatId, dataHandler);
-
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            this.xtermService.writeToSession(userId, 'copilot');
-
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
-            const dimensions = this.xtermService.getSessionDimensions(userId);
-
-            const imageBuffer = await this.xtermRendererService.renderToImage(
-                outputBuffer,
-                dimensions.rows,
-                dimensions.cols
-            );
-
-            const inlineKeyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
-            const replyKeyboard = new Keyboard()
-                .text('/1').text('/2').text('/3')
-                .resized()
-                .persistent();
-
-            const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
-                reply_markup: inlineKeyboard,
-            });
-
-            // Store the message ID for future updates
-            this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
-        } catch (error) {
-            await ctx.reply(
-                '❌ Failed to start terminal session.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        await this.handleAIAssistant(ctx, 'copilot');
     }
 
     private async handleClaude(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
-
-        try {
-            if (this.xtermService.hasSession(userId)) {
-                const sentMsg = await ctx.reply(
-                    '⚠️ You already have an active terminal session.\n\n' +
-                    'Use /close to terminate it first, or continue using it.'
-                );
-
-                const deleteTimeout = this.configService.getMessageDeleteTimeout();
-                if (deleteTimeout > 0) {
-                    setTimeout(async () => {
-                        try {
-                            await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                        } catch (error) {
-                            console.error('Failed to delete active session message:', error);
-                        }
-                    }, deleteTimeout);
-                }
-                return;
-            }
-
-            const dataHandler = this.coderService.createTerminalDataHandler({
-                onBell: this.handleBellNotification.bind(this),
-                onConfirmationPrompt: this.handleConfirmNotification.bind(this),
-            });
-
-            this.xtermService.createSession(userId, chatId, dataHandler);
-
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            this.xtermService.writeToSession(userId, 'claude');
-
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
-            const dimensions = this.xtermService.getSessionDimensions(userId);
-
-            const imageBuffer = await this.xtermRendererService.renderToImage(
-                outputBuffer,
-                dimensions.rows,
-                dimensions.cols
-            );
-
-            const inlineKeyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
-            const replyKeyboard = new Keyboard()
-                .text('/1').text('/2').text('/3')
-                .resized()
-                .persistent();
-
-            const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
-                reply_markup: inlineKeyboard,
-            });
-
-            // Store the message ID for future updates
-            this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
-        } catch (error) {
-            await ctx.reply(
-                '❌ Failed to start terminal session.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        await this.handleAIAssistant(ctx, 'claude');
     }
 
     private async handleCursor(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
-
-        try {
-            if (this.xtermService.hasSession(userId)) {
-                const sentMsg = await ctx.reply(
-                    '⚠️ You already have an active terminal session.\n\n' +
-                    'Use /close to terminate it first, or continue using it.'
-                );
-
-                const deleteTimeout = this.configService.getMessageDeleteTimeout();
-                if (deleteTimeout > 0) {
-                    setTimeout(async () => {
-                        try {
-                            await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                        } catch (error) {
-                            console.error('Failed to delete active session message:', error);
-                        }
-                    }, deleteTimeout);
-                }
-                return;
-            }
-
-            const dataHandler = this.coderService.createTerminalDataHandler({
-                onBell: this.handleBellNotification.bind(this),
-                onConfirmationPrompt: this.handleConfirmNotification.bind(this),
-            });
-
-            this.xtermService.createSession(userId, chatId, dataHandler);
-
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            this.xtermService.writeToSession(userId, 'cursor');
-
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
-            const dimensions = this.xtermService.getSessionDimensions(userId);
-
-            const imageBuffer = await this.xtermRendererService.renderToImage(
-                outputBuffer,
-                dimensions.rows,
-                dimensions.cols
-            );
-
-            const inlineKeyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
-            const replyKeyboard = new Keyboard()
-                .text('/1').text('/2').text('/3')
-                .resized()
-                .persistent();
-
-            const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
-                reply_markup: inlineKeyboard,
-            });
-
-            // Store the message ID for future updates
-            this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
-        } catch (error) {
-            await ctx.reply(
-                '❌ Failed to start terminal session.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        await this.handleAIAssistant(ctx, 'cursor');
     }
 
     private async handleSend(ctx: Context): Promise<void> {
@@ -565,7 +415,7 @@ export class CoderBot {
 
         try {
             if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply('❌ No active session.\n\nUse /start to create one.');
+                await ctx.reply(Messages.NO_ACTIVE_SESSION);
                 return;
             }
 
@@ -590,23 +440,11 @@ export class CoderBot {
 
             this.xtermService.writeRawToSession(userId, '\r');
 
-            const sentMsg = await ctx.reply('✅ Sent - Use /screen to view the output or refresh any existing screen.');
+            const sentMsg = await ctx.reply(`✅ Sent - ${Messages.VIEW_SCREEN_HINT}`);
 
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete message:', error);
-                    }
-                }, deleteTimeout);
-            }
+            await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
         } catch (error) {
-            await ctx.reply(
-                '❌ Failed to send to terminal.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
+            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
         }
     }
 
@@ -616,9 +454,7 @@ export class CoderBot {
 
         try {
             if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply(
-                    '⚠️ No active terminal session to close.\n\nUse /start to start one.'
-                );
+                await ctx.reply(Messages.NO_SESSION_TO_CLOSE);
                 return;
             }
 
@@ -632,10 +468,7 @@ export class CoderBot {
                 { parse_mode: 'Markdown' }
             );
         } catch (error) {
-            await ctx.reply(
-                '❌ Failed to close terminal session.\n\n' +
-                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
+            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.CLOSE_TERMINAL, error));
         }
     }
 
@@ -655,16 +488,7 @@ export class CoderBot {
             { parse_mode: 'Markdown' }
         );
 
-        const deleteTimeout = this.configService.getMessageDeleteTimeout();
-        if (deleteTimeout > 0) {
-            setTimeout(async () => {
-                try {
-                    await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                } catch (error) {
-                    console.error('Failed to delete start message:', error);
-                }
-            }, deleteTimeout * 2);
-        }
+        await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 2);
     }
 
     private async handleHelp(ctx: Context): Promise<void> {
@@ -707,16 +531,7 @@ export class CoderBot {
             { parse_mode: 'Markdown' }
         );
 
-        const deleteTimeout = this.configService.getMessageDeleteTimeout();
-        if (deleteTimeout > 0) {
-            setTimeout(async () => {
-                try {
-                    await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
-                } catch (error) {
-                    console.error('Failed to delete help message:', error);
-                }
-            }, deleteTimeout * 2);
-        }
+        await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 2);
     }
 
     private async handleKillbot(ctx: Context): Promise<void> {
