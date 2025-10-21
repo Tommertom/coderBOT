@@ -1,7 +1,7 @@
 import { Bot, Context, InlineKeyboard, InputFile, Keyboard } from 'grammy';
-import { xtermService } from '../xterm/xterm.service.js';
-import { xtermRendererService } from '../xterm/xterm-renderer.service.js';
-import { coderService } from './coder.service.js';
+import { XtermService } from '../xterm/xterm.service.js';
+import { XtermRendererService } from '../xterm/xterm-renderer.service.js';
+import { CoderService } from './coder.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -12,11 +12,22 @@ export class CoderBot {
     private botId: string;
     private mediaPath: string;
     private receivedPath: string;
+    private xtermService: XtermService;
+    private xtermRendererService: XtermRendererService;
+    private coderService: CoderService;
 
-    constructor(botId: string) {
+    constructor(
+        botId: string,
+        xtermService: XtermService,
+        xtermRendererService: XtermRendererService,
+        coderService: CoderService
+    ) {
         this.botId = botId;
-        this.mediaPath = coderService.getMediaPath();
-        this.receivedPath = coderService.getReceivedPath();
+        this.xtermService = xtermService;
+        this.xtermRendererService = xtermRendererService;
+        this.coderService = coderService;
+        this.mediaPath = this.coderService.getMediaPath();
+        this.receivedPath = this.coderService.getReceivedPath();
         this.ensureReceivedDirectory();
     }
 
@@ -47,15 +58,15 @@ export class CoderBot {
     }
 
     private async refreshScreen(userId: string, chatId: number): Promise<void> {
-        if (!xtermService.hasSession(this.botId, userId)) {
+        if (!this.xtermService.hasSession(userId)) {
             return;
         }
 
         try {
-            const outputBuffer = xtermService.getSessionOutputBuffer(this.botId, userId);
-            const dimensions = xtermService.getSessionDimensions(this.botId, userId);
+            const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
+            const dimensions = this.xtermService.getSessionDimensions(userId);
 
-            const imageBuffer = await xtermRendererService.renderToImage(
+            const imageBuffer = await this.xtermRendererService.renderToImage(
                 outputBuffer,
                 dimensions.rows,
                 dimensions.cols
@@ -78,14 +89,14 @@ export class CoderBot {
         }
 
         try {
-            const lastMessageId = xtermService.getLastScreenshotMessageId(this.botId, userId);
+            const lastMessageId = this.xtermService.getLastScreenshotMessageId(userId);
 
             if (lastMessageId) {
                 // Update the existing screenshot
-                const outputBuffer = xtermService.getSessionOutputBuffer(this.botId, userId);
-                const dimensions = xtermService.getSessionDimensions(this.botId, userId);
+                const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
+                const dimensions = this.xtermService.getSessionDimensions(userId);
 
-                const imageBuffer = await xtermRendererService.renderToImage(
+                const imageBuffer = await this.xtermRendererService.renderToImage(
                     outputBuffer,
                     dimensions.rows,
                     dimensions.cols
@@ -116,7 +127,7 @@ export class CoderBot {
         }
 
         try {
-            const outputBuffer = xtermService.getSessionOutputBuffer(this.botId, userId);
+            const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
 
             // Extract numbered options from the terminal output
             const fullOutput = outputBuffer.join('');
@@ -166,7 +177,7 @@ export class CoderBot {
 
         try {
             if (callbackData === 'refresh_screen') {
-                if (!xtermService.hasSession(this.botId, userId)) {
+                if (!this.xtermService.hasSession(userId)) {
                     try {
                         await ctx.answerCallbackQuery({ text: '❌ No active terminal session' });
                     } catch (e) {
@@ -181,10 +192,10 @@ export class CoderBot {
                     console.error('Failed to answer callback query:', e);
                 }
 
-                const outputBuffer = xtermService.getSessionOutputBuffer(this.botId, userId);
-                const dimensions = xtermService.getSessionDimensions(this.botId, userId);
+                const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
+                const dimensions = this.xtermService.getSessionDimensions(userId);
 
-                const imageBuffer = await xtermRendererService.renderToImage(
+                const imageBuffer = await this.xtermRendererService.renderToImage(
                     outputBuffer,
                     dimensions.rows,
                     dimensions.cols
@@ -203,7 +214,7 @@ export class CoderBot {
                 return;
             }
 
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 try {
                     await ctx.answerCallbackQuery({ text: '❌ No active terminal session' });
                 } catch (e) {
@@ -214,7 +225,7 @@ export class CoderBot {
 
             if (callbackData.match(/^\/[1-5]$/)) {
                 const number = callbackData.substring(1);
-                xtermService.writeRawToSession(this.botId, userId, number);
+                this.xtermService.writeRawToSession(userId, number);
                 try {
                     await ctx.answerCallbackQuery({ text: `✅ Sent: ${number}` });
                 } catch (e) {
@@ -222,7 +233,7 @@ export class CoderBot {
                 }
             } else if (callbackData.startsWith('/')) {
                 const command = callbackData.substring(1);
-                xtermService.writeToSession(this.botId, userId, command);
+                this.xtermService.writeToSession(userId, command);
                 try {
                     await ctx.answerCallbackQuery({ text: `✅ Executed: /${command}` });
                 } catch (e) {
@@ -312,18 +323,18 @@ export class CoderBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply('❌ No active session.\n\nUse /start to create one.');
                 return;
             }
 
-            const processedText = coderService.replaceMediaPlaceholder(text);
+            const processedText = this.coderService.replaceMediaPlaceholder(text);
 
-            xtermService.writeRawToSession(this.botId, userId, processedText);
+            this.xtermService.writeRawToSession(userId, processedText);
 
             await new Promise(resolve => setTimeout(resolve, 50));
 
-            xtermService.writeRawToSession(this.botId, userId, '\r');
+            this.xtermService.writeRawToSession(userId, '\r');
 
             const sentMsg = await ctx.reply('✅ Sent - Use /screen to view the output or refresh any existing screen.');
 
@@ -350,7 +361,7 @@ export class CoderBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (xtermService.hasSession(this.botId, userId)) {
+            if (this.xtermService.hasSession(userId)) {
                 await ctx.reply(
                     '⚠️ You already have an active terminal session.\n\n' +
                     'Use /close to terminate it first, or continue using it.'
@@ -380,27 +391,27 @@ export class CoderBot {
                 }
             }
 
-            const dataHandler = coderService.createTerminalDataHandler({
+            const dataHandler = this.coderService.createTerminalDataHandler({
                 onBell: this.handleBellNotification.bind(this),
                 onConfirmationPrompt: this.handleConfirmNotification.bind(this),
             });
 
-            xtermService.createSession(this.botId, userId, chatId, dataHandler);
+            this.xtermService.createSession(userId, chatId, dataHandler);
 
             await new Promise(resolve => setTimeout(resolve, 500));
 
             if (directory) {
-                xtermService.writeToSession(this.botId, userId, `cd ${directory} && copilot`);
+                this.xtermService.writeToSession(userId, `cd ${directory} && copilot`);
             } else {
-                xtermService.writeToSession(this.botId, userId, 'copilot');
+                this.xtermService.writeToSession(userId, 'copilot');
             }
 
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            const outputBuffer = xtermService.getSessionOutputBuffer(this.botId, userId);
-            const dimensions = xtermService.getSessionDimensions(this.botId, userId);
+            const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
+            const dimensions = this.xtermService.getSessionDimensions(userId);
 
-            const imageBuffer = await xtermRendererService.renderToImage(
+            const imageBuffer = await this.xtermRendererService.renderToImage(
                 outputBuffer,
                 dimensions.rows,
                 dimensions.cols
@@ -417,7 +428,7 @@ export class CoderBot {
             });
 
             // Store the message ID for future updates
-            xtermService.setLastScreenshotMessageId(this.botId, userId, sentMessage.message_id);
+            this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
         } catch (error) {
             await ctx.reply(
                 '❌ Failed to start terminal session.\n\n' +
@@ -431,7 +442,7 @@ export class CoderBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (xtermService.hasSession(this.botId, userId)) {
+            if (this.xtermService.hasSession(userId)) {
                 await ctx.reply(
                     '⚠️ You already have an active terminal session.\n\n' +
                     'Use /close to terminate it first, or continue using it.'
@@ -461,27 +472,27 @@ export class CoderBot {
                 }
             }
 
-            const dataHandler = coderService.createTerminalDataHandler({
+            const dataHandler = this.coderService.createTerminalDataHandler({
                 onBell: this.handleBellNotification.bind(this),
                 onConfirmationPrompt: this.handleConfirmNotification.bind(this),
             });
 
-            xtermService.createSession(this.botId, userId, chatId, dataHandler);
+            this.xtermService.createSession(userId, chatId, dataHandler);
 
             await new Promise(resolve => setTimeout(resolve, 500));
 
             if (directory) {
-                xtermService.writeToSession(this.botId, userId, `cd ${directory} && claude`);
+                this.xtermService.writeToSession(userId, `cd ${directory} && claude`);
             } else {
-                xtermService.writeToSession(this.botId, userId, 'claude');
+                this.xtermService.writeToSession(userId, 'claude');
             }
 
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            const outputBuffer = xtermService.getSessionOutputBuffer(this.botId, userId);
-            const dimensions = xtermService.getSessionDimensions(this.botId, userId);
+            const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
+            const dimensions = this.xtermService.getSessionDimensions(userId);
 
-            const imageBuffer = await xtermRendererService.renderToImage(
+            const imageBuffer = await this.xtermRendererService.renderToImage(
                 outputBuffer,
                 dimensions.rows,
                 dimensions.cols
@@ -498,7 +509,7 @@ export class CoderBot {
             });
 
             // Store the message ID for future updates
-            xtermService.setLastScreenshotMessageId(this.botId, userId, sentMessage.message_id);
+            this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
         } catch (error) {
             await ctx.reply(
                 '❌ Failed to start terminal session.\n\n' +
@@ -512,7 +523,7 @@ export class CoderBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (xtermService.hasSession(this.botId, userId)) {
+            if (this.xtermService.hasSession(userId)) {
                 await ctx.reply(
                     '⚠️ You already have an active terminal session.\n\n' +
                     'Use /close to terminate it first, or continue using it.'
@@ -542,27 +553,27 @@ export class CoderBot {
                 }
             }
 
-            const dataHandler = coderService.createTerminalDataHandler({
+            const dataHandler = this.coderService.createTerminalDataHandler({
                 onBell: this.handleBellNotification.bind(this),
                 onConfirmationPrompt: this.handleConfirmNotification.bind(this),
             });
 
-            xtermService.createSession(this.botId, userId, chatId, dataHandler);
+            this.xtermService.createSession(userId, chatId, dataHandler);
 
             await new Promise(resolve => setTimeout(resolve, 500));
 
             if (directory) {
-                xtermService.writeToSession(this.botId, userId, `cd ${directory} && cursor`);
+                this.xtermService.writeToSession(userId, `cd ${directory} && cursor`);
             } else {
-                xtermService.writeToSession(this.botId, userId, 'cursor');
+                this.xtermService.writeToSession(userId, 'cursor');
             }
 
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            const outputBuffer = xtermService.getSessionOutputBuffer(this.botId, userId);
-            const dimensions = xtermService.getSessionDimensions(this.botId, userId);
+            const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
+            const dimensions = this.xtermService.getSessionDimensions(userId);
 
-            const imageBuffer = await xtermRendererService.renderToImage(
+            const imageBuffer = await this.xtermRendererService.renderToImage(
                 outputBuffer,
                 dimensions.rows,
                 dimensions.cols
@@ -579,7 +590,7 @@ export class CoderBot {
             });
 
             // Store the message ID for future updates
-            xtermService.setLastScreenshotMessageId(this.botId, userId, sentMessage.message_id);
+            this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
         } catch (error) {
             await ctx.reply(
                 '❌ Failed to start terminal session.\n\n' +
@@ -593,7 +604,7 @@ export class CoderBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply('❌ No active session.\n\nUse /start to create one.');
                 return;
             }
@@ -611,13 +622,13 @@ export class CoderBot {
                 return;
             }
 
-            const processedText = coderService.replaceMediaPlaceholder(text);
+            const processedText = this.coderService.replaceMediaPlaceholder(text);
 
-            xtermService.writeRawToSession(this.botId, userId, processedText);
+            this.xtermService.writeRawToSession(userId, processedText);
 
             await new Promise(resolve => setTimeout(resolve, 50));
 
-            xtermService.writeRawToSession(this.botId, userId, '\r');
+            this.xtermService.writeRawToSession(userId, '\r');
 
             const sentMsg = await ctx.reply('✅ Sent - Use /screen to view the output or refresh any existing screen.');
 
@@ -644,14 +655,14 @@ export class CoderBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply(
                     '⚠️ No active terminal session to close.\n\nUse /start to start one.'
                 );
                 return;
             }
 
-            xtermService.closeSession(this.botId, userId);
+            this.xtermService.closeSession(userId);
 
             await ctx.reply(
                 '✅ *Coder Session Closed*\n\n' +

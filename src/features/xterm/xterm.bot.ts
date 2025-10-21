@@ -1,11 +1,13 @@
 import { Bot, Context, InputFile, InlineKeyboard } from 'grammy';
-import { xtermService } from './xterm.service.js';
-import { xtermRendererService } from './xterm-renderer.service.js';
+import { XtermService } from './xterm.service.js';
+import { XtermRendererService } from './xterm-renderer.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
 
 export class XtermBot {
     private bot: Bot | null = null;
     private botId: string;
+    private xtermService: XtermService;
+    private xtermRendererService: XtermRendererService;
 
     private readonly CTRL_MAPPINGS: Record<string, string> = {
         '@': '\x00',
@@ -43,8 +45,14 @@ export class XtermBot {
         '?': '\x7f',
     };
 
-    constructor(botId: string) {
+    constructor(
+        botId: string,
+        xtermService: XtermService,
+        xtermRendererService: XtermRendererService
+    ) {
         this.botId = botId;
+        this.xtermService = xtermService;
+        this.xtermRendererService = xtermRendererService;
     }
 
     registerHandlers(bot: Bot): void {
@@ -72,12 +80,12 @@ export class XtermBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply('❌ No active session.\n\nUse /start to create one.');
                 return;
             }
 
-            xtermService.writeRawToSession(this.botId, userId, number);
+            this.xtermService.writeRawToSession(userId, number);
 
             const sentMsg = await ctx.reply(`✅ Sent: ${number}`);
 
@@ -104,7 +112,7 @@ export class XtermBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply('❌ No active session.\n\nUse /start to create one.');
                 return;
             }
@@ -144,7 +152,7 @@ export class XtermBot {
                 return;
             }
 
-            xtermService.writeRawToSession(this.botId, userId, controlCode);
+            this.xtermService.writeRawToSession(userId, controlCode);
 
             const charDisplay = char === '\\' ? '\\\\' : char;
             const sentMsg = await ctx.reply(
@@ -174,7 +182,7 @@ export class XtermBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (xtermService.hasSession(this.botId, userId)) {
+            if (this.xtermService.hasSession(userId)) {
                 await ctx.reply(
                     '⚠️ You already have an active terminal session.\n\n' +
                     'Use /close to terminate it first, or continue using it.'
@@ -182,7 +190,7 @@ export class XtermBot {
                 return;
             }
 
-            xtermService.createSession(this.botId, userId, chatId);
+            this.xtermService.createSession(userId, chatId);
 
             await ctx.reply(
                 '🖥️ *Terminal Session Started*\n\n' +
@@ -219,7 +227,7 @@ export class XtermBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply('❌ No active session.\n\nUse /start to create one.');
                 return;
             }
@@ -238,7 +246,7 @@ export class XtermBot {
                 return;
             }
 
-            xtermService.writeRawToSession(this.botId, userId, keys);
+            this.xtermService.writeRawToSession(userId, keys);
 
             await ctx.reply(`✅ Sent keys: \`${keys}\`\n\nUse /screen to view the output or refresh any existing screen.`, { parse_mode: 'Markdown' });
         } catch (error) {
@@ -254,12 +262,12 @@ export class XtermBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply('❌ No active session.\n\nUse /start to create one. Or type /help for assistance.');
                 return;
             }
 
-            xtermService.writeRawToSession(this.botId, userId, '\t');
+            this.xtermService.writeRawToSession(userId, '\t');
 
             const sentMsg = await ctx.reply('✅ Sent Tab character\n\nUse /screen to view the output or refresh any existing screen.');
 
@@ -286,12 +294,12 @@ export class XtermBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply('❌ No active session.\n\nUse /start to create one.');
                 return;
             }
 
-            xtermService.writeRawToSession(this.botId, userId, '\r');
+            this.xtermService.writeRawToSession(userId, '\r');
 
             const sentMsg = await ctx.reply('✅ Sent Enter key\n\nUse /screen to view the output or refresh any existing screen.');
 
@@ -318,12 +326,12 @@ export class XtermBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply('❌ No active session.\n\nUse /start to create one.');
                 return;
             }
 
-            xtermService.writeRawToSession(this.botId, userId, ' ');
+            this.xtermService.writeRawToSession(userId, ' ');
 
             const sentMsg = await ctx.reply('✅ Sent Space character\n\nUse /screen to view the output or refresh any existing screen.');
 
@@ -350,12 +358,12 @@ export class XtermBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply('❌ No active session.\n\nUse /start to create one.');
                 return;
             }
 
-            xtermService.writeRawToSession(this.botId, userId, '\x7f');
+            this.xtermService.writeRawToSession(userId, '\x7f');
 
             const sentMsg = await ctx.reply('✅ Sent Delete key\n\nUse /screen to view the output or refresh any existing screen.');
 
@@ -382,12 +390,12 @@ export class XtermBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply('❌ No active session.\n\nUse /start to create one.');
                 return;
             }
 
-            xtermService.writeRawToSession(this.botId, userId, '\x03');
+            this.xtermService.writeRawToSession(userId, '\x03');
 
             const sentMsg = await ctx.reply('✅ Sent Ctrl+C - Use /screen to view the output or refresh any existing screen.');
 
@@ -414,12 +422,12 @@ export class XtermBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply('❌ No active session.\n\nUse /start to create one.');
                 return;
             }
 
-            xtermService.writeRawToSession(this.botId, userId, '\x18');
+            this.xtermService.writeRawToSession(userId, '\x18');
 
             const sentMsg = await ctx.reply('✅ Sent Ctrl+X - Use /screen to view the output or refresh any existing screen.');
 
@@ -446,12 +454,12 @@ export class XtermBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply('❌ No active session.\n\nUse /start to create one.');
                 return;
             }
 
-            xtermService.writeRawToSession(this.botId, userId, '\x1b');
+            this.xtermService.writeRawToSession(userId, '\x1b');
 
             const sentMsg = await ctx.reply('✅ Sent Escape key - Use /screen to view the output or refresh any existing screen.');
 
@@ -478,17 +486,17 @@ export class XtermBot {
         const chatId = ctx.chat!.id;
 
         try {
-            if (!xtermService.hasSession(this.botId, userId)) {
+            if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply('❌ No active session.\n\nUse /start to create one.');
                 return;
             }
 
             const statusMsg = await ctx.reply('📸 Capturing terminal screen...');
 
-            const outputBuffer = xtermService.getSessionOutputBuffer(this.botId, userId);
-            const dimensions = xtermService.getSessionDimensions(this.botId, userId);
+            const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
+            const dimensions = this.xtermService.getSessionDimensions(userId);
 
-            const imageBuffer = await xtermRendererService.renderToImage(
+            const imageBuffer = await this.xtermRendererService.renderToImage(
                 outputBuffer,
                 dimensions.rows,
                 dimensions.cols
@@ -503,7 +511,7 @@ export class XtermBot {
             });
 
             // Store the message ID for future updates
-            xtermService.setLastScreenshotMessageId(this.botId, userId, sentMessage.message_id);
+            this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
         } catch (error) {
             await ctx.reply(
                 '❌ Failed to capture terminal screen.\n\n' +

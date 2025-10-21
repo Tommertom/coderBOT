@@ -11,12 +11,12 @@ export class XtermService {
         this.startTimeoutChecker();
     }
 
-    private getSessionKey(botId: string, userId: string): string {
-        return `${botId}:${userId}`;
+    private getSessionKey(userId: string): string {
+        return userId;
     }
 
-    createSession(botId: string, userId: string, chatId: number, onDataCallback?: (userId: string, chatId: number, data: string) => void): void {
-        const sessionKey = this.getSessionKey(botId, userId);
+    createSession(userId: string, chatId: number, onDataCallback?: (userId: string, chatId: number, data: string) => void): void {
+        const sessionKey = this.getSessionKey(userId);
         if (this.sessions.has(sessionKey)) {
             throw new Error('Session already exists for this user with this bot');
         }
@@ -63,12 +63,12 @@ export class XtermService {
         }
     }
 
-    hasSession(botId: string, userId: string): boolean {
-        return this.sessions.has(this.getSessionKey(botId, userId));
+    hasSession(userId: string): boolean {
+        return this.sessions.has(this.getSessionKey(userId));
     }
 
-    writeToSession(botId: string, userId: string, data: string): void {
-        const session = this.sessions.get(this.getSessionKey(botId, userId));
+    writeToSession(userId: string, data: string): void {
+        const session = this.sessions.get(this.getSessionKey(userId));
         if (!session) {
             throw new Error('No active session found');
         }
@@ -81,8 +81,8 @@ export class XtermService {
         }
     }
 
-    writeRawToSession(botId: string, userId: string, data: string): void {
-        const session = this.sessions.get(this.getSessionKey(botId, userId));
+    writeRawToSession(userId: string, data: string): void {
+        const session = this.sessions.get(this.getSessionKey(userId));
         if (!session) {
             throw new Error('No active session found');
         }
@@ -95,8 +95,8 @@ export class XtermService {
         }
     }
 
-    async getSessionOutput(botId: string, userId: string, waitMs: number = 500): Promise<string> {
-        const session = this.sessions.get(this.getSessionKey(botId, userId));
+    async getSessionOutput(userId: string, waitMs: number = 500): Promise<string> {
+        const session = this.sessions.get(this.getSessionKey(userId));
         if (!session) {
             throw new Error('No active session found');
         }
@@ -106,8 +106,8 @@ export class XtermService {
         return session.output.join('');
     }
 
-    getSessionOutputBuffer(botId: string, userId: string): string[] {
-        const session = this.sessions.get(this.getSessionKey(botId, userId));
+    getSessionOutputBuffer(userId: string): string[] {
+        const session = this.sessions.get(this.getSessionKey(userId));
         if (!session) {
             throw new Error('No active session found');
         }
@@ -115,8 +115,8 @@ export class XtermService {
         return [...session.output];
     }
 
-    getSessionDimensions(botId: string, userId: string): { rows: number; cols: number } {
-        const session = this.sessions.get(this.getSessionKey(botId, userId));
+    getSessionDimensions(userId: string): { rows: number; cols: number } {
+        const session = this.sessions.get(this.getSessionKey(userId));
         if (!session) {
             throw new Error('No active session found');
         }
@@ -127,8 +127,8 @@ export class XtermService {
         };
     }
 
-    closeSession(botId: string, userId: string): void {
-        const session = this.sessions.get(this.getSessionKey(botId, userId));
+    closeSession(userId: string): void {
+        const session = this.sessions.get(this.getSessionKey(userId));
         if (!session) {
             throw new Error('No active session found');
         }
@@ -139,43 +139,41 @@ export class XtermService {
             console.error('Error killing PTY process:', error);
         }
 
-        this.sessions.delete(this.getSessionKey(botId, userId));
+        this.sessions.delete(this.getSessionKey(userId));
     }
 
     getActiveSessions(): number {
         return this.sessions.size;
     }
 
-    setLastScreenshotMessageId(botId: string, userId: string, messageId: number): void {
-        const session = this.sessions.get(this.getSessionKey(botId, userId));
+    setLastScreenshotMessageId(userId: string, messageId: number): void {
+        const session = this.sessions.get(this.getSessionKey(userId));
         if (session) {
             session.lastScreenshotMessageId = messageId;
         }
     }
 
-    getLastScreenshotMessageId(botId: string, userId: string): number | undefined {
-        const session = this.sessions.get(this.getSessionKey(botId, userId));
+    getLastScreenshotMessageId(userId: string): number | undefined {
+        const session = this.sessions.get(this.getSessionKey(userId));
         return session?.lastScreenshotMessageId;
     }
 
     private startTimeoutChecker(): void {
         this.timeoutCheckerInterval = setInterval(() => {
             const now = new Date();
-            const sessionsToRemove: { sessionKey: string; botId: string; userId: string }[] = [];
+            const sessionsToRemove: string[] = [];
 
             this.sessions.forEach((session, sessionKey) => {
                 const idleTime = now.getTime() - session.lastActivity.getTime();
                 if (idleTime > this.config.sessionTimeout) {
-                    // Extract botId and userId from composite key
-                    const [botId, userId] = sessionKey.split(':');
-                    sessionsToRemove.push({ sessionKey, botId, userId });
+                    sessionsToRemove.push(sessionKey);
                 }
             });
 
-            sessionsToRemove.forEach(({ sessionKey, botId, userId }) => {
+            sessionsToRemove.forEach((sessionKey) => {
                 console.log(`Session timeout for ${sessionKey}`);
                 try {
-                    this.closeSession(botId, userId);
+                    this.closeSession(sessionKey);
                 } catch (error) {
                     console.error(`Error closing timed out session for ${sessionKey}:`, error);
                 }
@@ -199,5 +197,3 @@ export class XtermService {
         this.sessions.clear();
     }
 }
-
-export const xtermService = new XtermService();

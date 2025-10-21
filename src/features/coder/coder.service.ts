@@ -5,7 +5,7 @@ export interface TerminalDataHandlers {
     onConfirmationPrompt?: (userId: string, chatId: number, data: string) => void;
 }
 
-class CoderService {
+export class CoderService {
     private config: CoderConfig;
 
     constructor() {
@@ -43,5 +43,3 @@ class CoderService {
         };
     }
 }
-
-export const coderService = new CoderService();

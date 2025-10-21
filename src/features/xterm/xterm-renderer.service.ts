@@ -138,5 +138,3 @@ export class XtermRendererService {
         this.isInitialized = false;
     }
 }
-
-export const xtermRendererService = new XtermRendererService();

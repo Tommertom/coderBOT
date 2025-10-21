@@ -1,8 +1,8 @@
 import { Bot } from "grammy";
 import { XtermBot } from './features/xterm/xterm.bot.js';
 import { CoderBot } from './features/coder/coder.bot.js';
-import { xtermService } from './features/xterm/xterm.service.js';
-import { xtermRendererService } from './features/xterm/xterm-renderer.service.js';
+import { ServiceContainerFactory } from './services/service-container.factory.js';
+import { ServiceContainer } from './services/service-container.interface.js';
 import { mediaWatcherService } from './features/media/media-watcher.service.js';
 import { AccessControlMiddleware } from './middleware/access-control.middleware.js';
 import dotenv from 'dotenv';
@@ -10,6 +10,13 @@ import dotenv from 'dotenv';
 console.log('Starting CoderBot...')
 
 dotenv.config();
+
+interface BotInstance {
+    bot: Bot;
+    services: ServiceContainer;
+    xtermBot: XtermBot;
+    coderBot: CoderBot;
+}
 
 // Parse comma-separated bot tokens
 const botTokens = (process.env.TELEGRAM_BOT_TOKENS || '')
@@ -30,6 +37,8 @@ const bots: Bot[] = botTokens.map((token, index) => {
     console.log(`Creating bot instance ${index + 1}/${botTokens.length}`);
     return new Bot(token);
 });
+
+const botInstances: BotInstance[] = [];
 
 async function startBot() {
     try {
@@ -54,8 +63,29 @@ async function startBot() {
             const botInfo = await bot.api.getMe();
             const botId = botInfo.id.toString();
 
-            const xtermBot = new XtermBot(botId);
-            const coderBot = new CoderBot(botId);
+            // Create per-bot services
+            const services = ServiceContainerFactory.create(botId);
+
+            // Pass services to bot classes
+            const xtermBot = new XtermBot(
+                botId,
+                services.xtermService,
+                services.xtermRendererService
+            );
+            const coderBot = new CoderBot(
+                botId,
+                services.xtermService,
+                services.xtermRendererService,
+                services.coderService
+            );
+
+            // Store bot instance with its services
+            botInstances.push({
+                bot,
+                services,
+                xtermBot,
+                coderBot
+            });
 
             // Register handlers - CoderBot first for general commands, then XtermBot for specific ones
             coderBot.registerHandlers(bot);
@@ -86,20 +116,30 @@ async function startBot() {
 process.on('SIGINT', async () => {
     console.log('Received SIGINT, shutting down gracefully...');
     mediaWatcherService.cleanup();
-    xtermService.cleanup();
-    await xtermRendererService.cleanup();
-    // Stop all bot instances
-    await Promise.all(bots.map(bot => bot.stop()));
+    
+    // Cleanup each bot's services independently
+    await Promise.all(
+        botInstances.map(async (instance) => {
+            await instance.services.cleanup();
+            await instance.bot.stop();
+        })
+    );
+    
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
     console.log('Received SIGTERM, shutting down gracefully...');
     mediaWatcherService.cleanup();
-    xtermService.cleanup();
-    await xtermRendererService.cleanup();
-    // Stop all bot instances
-    await Promise.all(bots.map(bot => bot.stop()));
+    
+    // Cleanup each bot's services independently
+    await Promise.all(
+        botInstances.map(async (instance) => {
+            await instance.services.cleanup();
+            await instance.bot.stop();
+        })
+    );
+    
     process.exit(0);
 });
 
