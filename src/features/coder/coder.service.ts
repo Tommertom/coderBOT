@@ -70,9 +70,10 @@ export class CoderService {
             }
 
             // Check for Copilot confirmation prompts in the buffered data
-            if (buffer.includes(' ❯ 1.') && handlers.onConfirmationPrompt) {
-                handlers.onConfirmationPrompt(userId, chatId, buffer);
-                console.log('Detected Copilot confirmation prompt');
+            if (buffer.includes('1. Yes') && handlers.onConfirmationPrompt) {
+                setTimeout(() => {
+                    handlers.onConfirmationPrompt(userId, chatId, buffer);
+                }, 3000);
             }
         };
     }

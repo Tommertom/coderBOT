@@ -495,12 +495,11 @@ export class CoderBot {
         const sentMsg = await ctx.reply(
             '🤖 *Coder Bot - Complete Command Reference*\n\n' +
             '*Session Management:*\n' +
-            '/copilot \\[directory\\] - Start a new session with GitHub Copilot\n' +
-            '/claude \\[directory\\] - Start a new session with Claude AI\n' +
-            '/cursor \\[directory\\] - Start a new session with Cursor AI\n' +
-            '*Optional:* Provide a directory path to cd into before starting\n' +
-            '/xterm - Start a raw bash terminal session\n' +
+            '/copilot - Start a new session with GitHub Copilot\n' +
+            '/claude - Start a new session with Claude AI\n' +
+            '/cursor - Start a new session with Cursor AI\n' +
             '/close - Close the current terminal session\n\n' +
+            '/xterm - Start a raw bash terminal session\n' +
             '*Sending Text to Terminal:*\n' +
             'Type any message (not starting with /) - Sent directly to terminal with Enter\n' +
             '/send <text> - Send text to terminal with Enter\n' +

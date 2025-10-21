@@ -8,7 +8,7 @@ export const Messages = {
         'Use /close to terminate it first, or continue using it.',
 
     // View/refresh hints
-    VIEW_SCREEN_HINT: 'Use /screen to view the output or refresh any existing screen.',
+    VIEW_SCREEN_HINT: 'Use /screen to view the output or refresh.',
 
     // Session close messages
     NO_SESSION_TO_CLOSE: '⚠️ No active terminal session to close.\n\nUse /start to start one.',
