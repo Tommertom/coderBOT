@@ -196,7 +196,7 @@ export class XtermBot {
                 '🖥️ *Terminal Session Started*\n\n' +
                 '✅ Bash session is now active.\n\n' +
                 '*Available Commands:*\n' +
-                '/coder <text> - Send text to terminal with Enter\n' +
+                '/send <text> - Send text to terminal with Enter\n' +
                 'Send any message - Sent directly to terminal with Enter\n' +
                 '/keys <text> - Send text without Enter\n' +
                 '/tab - Send Tab character\n' +

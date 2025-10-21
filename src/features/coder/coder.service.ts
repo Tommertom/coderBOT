@@ -3,6 +3,7 @@ import { DEFAULT_CODER_CONFIG, type CoderConfig } from './coder.types.js';
 export interface TerminalDataHandlers {
     onBell?: (userId: string, chatId: number) => void;
     onConfirmationPrompt?: (userId: string, chatId: number, data: string) => void;
+    onPromptDetected?: (userId: string, chatId: number, data: string) => void;
 }
 
 export class CoderService {
@@ -39,6 +40,11 @@ export class CoderService {
             if (data.includes(' ❯ 1.') && handlers.onConfirmationPrompt) {
                 handlers.onConfirmationPrompt(userId, chatId, data);
                 console.log('Detected Copilot confirmation prompt');
+            }
+
+            // Check for prompt with > character
+            if (data.includes('>') && handlers.onPromptDetected) {
+                handlers.onPromptDetected(userId, chatId, data);
             }
         };
     }

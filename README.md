@@ -197,7 +197,7 @@ npm run pm2:status   # Check status
 
 ### Sending Text to Terminal
 - **Regular text messages** - Sent directly to terminal with Enter
-- `/coder <text>` - Send text to terminal with Enter
+- `/send <text>` - Send text to terminal with Enter
 - `/keys <text>` - Send text without pressing Enter
 - **Tip:** Use `[media]` in your commands - it's replaced with the media directory path
 

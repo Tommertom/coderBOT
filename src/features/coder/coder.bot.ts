@@ -49,7 +49,7 @@ export class CoderBot {
         bot.command('copilot', AccessControlMiddleware.requireAccess, this.handleCopilot.bind(this));
         bot.command('claude', AccessControlMiddleware.requireAccess, this.handleClaude.bind(this));
         bot.command('cursor', AccessControlMiddleware.requireAccess, this.handleCursor.bind(this));
-        bot.command('coder', AccessControlMiddleware.requireAccess, this.handleCoder.bind(this));
+        bot.command('send', AccessControlMiddleware.requireAccess, this.handleSend.bind(this));
         bot.command('close', AccessControlMiddleware.requireAccess, this.handleClose.bind(this));
         bot.command('killbot', AccessControlMiddleware.requireAccess, this.handleKillbot.bind(this));
         bot.on('callback_query:data', AccessControlMiddleware.requireAccess, this.handleCallbackQuery.bind(this));
@@ -153,9 +153,47 @@ export class CoderBot {
                 message += '\n/1\t\t/2\t\t/3\t\t/4\t\t/5';
             }
 
-            await this.bot.api.sendMessage(chatId, message);
+            const sentMsg = await this.bot.api.sendMessage(chatId, message);
+
+            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+            if (deleteTimeout > 0) {
+                setTimeout(async () => {
+                    try {
+                        await this.bot!.api.deleteMessage(chatId, sentMsg.message_id);
+                    } catch (error) {
+                        console.error('Failed to delete confirmation notification message:', error);
+                    }
+                }, deleteTimeout);
+            }
         } catch (error) {
             console.error(`Failed to send confirmation notification: ${error}`);
+        }
+    }
+
+    private async handlePromptDetection(userId: string, chatId: number, data: string): Promise<void> {
+        if (!this.bot) {
+            console.error('Bot instance not available for prompt notification');
+            return;
+        }
+
+        try {
+            const sentMsg = await this.bot.api.sendMessage(
+                chatId, 
+                '✅ Prompt detected - terminal is waiting for input'
+            );
+
+            const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+            if (deleteTimeout > 0) {
+                setTimeout(async () => {
+                    try {
+                        await this.bot!.api.deleteMessage(chatId, sentMsg.message_id);
+                    } catch (error) {
+                        console.error('Failed to delete prompt notification message:', error);
+                    }
+                }, deleteTimeout);
+            }
+        } catch (error) {
+            console.error(`Failed to send prompt notification: ${error}`);
         }
     }
 
@@ -362,10 +400,21 @@ export class CoderBot {
 
         try {
             if (this.xtermService.hasSession(userId)) {
-                await ctx.reply(
+                const sentMsg = await ctx.reply(
                     '⚠️ You already have an active terminal session.\n\n' +
                     'Use /close to terminate it first, or continue using it.'
                 );
+
+                const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+                if (deleteTimeout > 0) {
+                    setTimeout(async () => {
+                        try {
+                            await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
+                        } catch (error) {
+                            console.error('Failed to delete active session message:', error);
+                        }
+                    }, deleteTimeout);
+                }
                 return;
             }
 
@@ -394,6 +443,7 @@ export class CoderBot {
             const dataHandler = this.coderService.createTerminalDataHandler({
                 onBell: this.handleBellNotification.bind(this),
                 onConfirmationPrompt: this.handleConfirmNotification.bind(this),
+                onPromptDetected: this.handlePromptDetection.bind(this),
             });
 
             this.xtermService.createSession(userId, chatId, dataHandler);
@@ -443,10 +493,21 @@ export class CoderBot {
 
         try {
             if (this.xtermService.hasSession(userId)) {
-                await ctx.reply(
+                const sentMsg = await ctx.reply(
                     '⚠️ You already have an active terminal session.\n\n' +
                     'Use /close to terminate it first, or continue using it.'
                 );
+
+                const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+                if (deleteTimeout > 0) {
+                    setTimeout(async () => {
+                        try {
+                            await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
+                        } catch (error) {
+                            console.error('Failed to delete active session message:', error);
+                        }
+                    }, deleteTimeout);
+                }
                 return;
             }
 
@@ -475,6 +536,7 @@ export class CoderBot {
             const dataHandler = this.coderService.createTerminalDataHandler({
                 onBell: this.handleBellNotification.bind(this),
                 onConfirmationPrompt: this.handleConfirmNotification.bind(this),
+                onPromptDetected: this.handlePromptDetection.bind(this),
             });
 
             this.xtermService.createSession(userId, chatId, dataHandler);
@@ -524,10 +586,21 @@ export class CoderBot {
 
         try {
             if (this.xtermService.hasSession(userId)) {
-                await ctx.reply(
+                const sentMsg = await ctx.reply(
                     '⚠️ You already have an active terminal session.\n\n' +
                     'Use /close to terminate it first, or continue using it.'
                 );
+
+                const deleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+                if (deleteTimeout > 0) {
+                    setTimeout(async () => {
+                        try {
+                            await ctx.api.deleteMessage(ctx.chat!.id, sentMsg.message_id);
+                        } catch (error) {
+                            console.error('Failed to delete active session message:', error);
+                        }
+                    }, deleteTimeout);
+                }
                 return;
             }
 
@@ -556,6 +629,7 @@ export class CoderBot {
             const dataHandler = this.coderService.createTerminalDataHandler({
                 onBell: this.handleBellNotification.bind(this),
                 onConfirmationPrompt: this.handleConfirmNotification.bind(this),
+                onPromptDetected: this.handlePromptDetection.bind(this),
             });
 
             this.xtermService.createSession(userId, chatId, dataHandler);
@@ -599,7 +673,7 @@ export class CoderBot {
         }
     }
 
-    private async handleCoder(ctx: Context): Promise<void> {
+    private async handleSend(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
         const chatId = ctx.chat!.id;
 
@@ -610,13 +684,13 @@ export class CoderBot {
             }
 
             const message = ctx.message?.text || '';
-            const text = message.replace('/coder', '').trim();
+            const text = message.replace('/send', '').trim();
 
             if (!text) {
                 await ctx.reply(
                     '⚠️ Please provide text to send.\n\n' +
-                    '*Usage:* `/coder <text>`\n' +
-                    '*Example:* `/coder ls -la`',
+                    '*Usage:* `/send <text>`\n' +
+                    '*Example:* `/send ls -la`',
                     { parse_mode: 'Markdown' }
                 );
                 return;
@@ -718,7 +792,7 @@ export class CoderBot {
             '/close - Close the current terminal session\n\n' +
             '*Sending Text to Terminal:*\n' +
             'Type any message (not starting with /) - Sent directly to terminal with Enter\n' +
-            '/coder <text> - Send text to terminal with Enter\n' +
+            '/send <text> - Send text to terminal with Enter\n' +
             '/keys <text> - Send text without pressing Enter\n' +
             '*Tip:* Use \\[media\\] in your text - it will be replaced with the media directory path\n\n' +
             '*Special Keys:*\n' +

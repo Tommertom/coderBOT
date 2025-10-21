@@ -93,7 +93,8 @@ async function startBot() {
 
             await bot.api.setMyCommands([
                 { command: 'screen', description: 'Capture and view terminal screenshot' },
-                { command: 'coder', description: 'Send text to terminal with Enter' },
+                { command: 'send', description: 'Send text to terminal with Enter' },
+                { command: 'help', description: 'Show complete command reference' },
                 { command: 'tab', description: 'Send Tab character' },
                 { command: 'copilot', description: 'Start a new terminal session with Copilot' },
                 { command: 'claude', description: 'Start a new terminal session with Claude' },
