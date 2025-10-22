@@ -18,13 +18,10 @@ console.log('================================================\n');
 
 // Windows compatibility warning
 if (process.platform === 'win32') {
-    console.log('⚠️  Windows Compatibility Notice:');
+    console.log('⚠️  Windows is not supported for direct installation.');
     console.log('   CoderBOT uses node-pty which requires native compilation.');
-    console.log('   You may need to install:');
-    console.log('   1. Windows Build Tools: npm install -g windows-build-tools');
-    console.log('   2. Python (for node-gyp)');
-    console.log('   OR use WSL2 (Windows Subsystem for Linux) for better compatibility.\n');
-    console.log('   Docker is recommended for Windows users.\n');
+    console.log('\n   📦 Please use Docker instead:');
+    console.log('   See https://github.com/Tommertom/coderBOT/blob/main/DOCKER_GUIDE.md\n');
 }
 
 // Check if .env file exists in current directory
@@ -102,7 +99,7 @@ if (isWindows) {
             output: process.stdout
         });
     }
-    
+
     // Windows doesn't support POSIX signals properly, just kill the child
     process.on('SIGINT', () => {
         child.kill();
