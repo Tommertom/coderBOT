@@ -24,6 +24,13 @@ export class ConfigService {
     // Message Configuration
     private readonly messageDeleteTimeout: number;
 
+    // Auto-refresh Configuration
+    private readonly screenRefreshInterval: number;
+    private readonly screenRefreshMaxCount: number;
+
+    // Bot Token Monitoring
+    private readonly botTokenMonitorInterval: number;
+
     // System Environment
     private readonly homeDirectory: string;
     private readonly systemEnv: { [key: string]: string };
@@ -62,6 +69,13 @@ export class ConfigService {
 
         // Load message configuration
         this.messageDeleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
+
+        // Load auto-refresh configuration
+        this.screenRefreshInterval = parseInt(process.env.SCREEN_REFRESH_INTERVAL || '5000', 10);
+        this.screenRefreshMaxCount = parseInt(process.env.SCREEN_REFRESH_MAX_COUNT || '5', 10);
+
+        // Load bot token monitoring configuration
+        this.botTokenMonitorInterval = parseInt(process.env.BOT_TOKEN_MONITOR_INTERVAL || '300000', 10);
 
         // Load system environment
         this.homeDirectory = process.env.HOME || '/tmp';
@@ -116,6 +130,20 @@ export class ConfigService {
         return this.messageDeleteTimeout;
     }
 
+    // Auto-refresh Configuration Getters
+    getScreenRefreshInterval(): number {
+        return this.screenRefreshInterval;
+    }
+
+    getScreenRefreshMaxCount(): number {
+        return this.screenRefreshMaxCount;
+    }
+
+    // Bot Token Monitoring Getters
+    getBotTokenMonitorInterval(): number {
+        return this.botTokenMonitorInterval;
+    }
+
     // System Environment Getters
     getHomeDirectory(): string {
         return this.homeDirectory;
@@ -148,6 +176,9 @@ export class ConfigService {
   - Xterm Shell: ${this.xtermShellPath}
   - Media Location: ${this.mediaTmpLocation}
   - Clean Up Media Dir: ${this.cleanUpMediaDir}
-  - Message Delete Timeout: ${this.messageDeleteTimeout}ms`;
+  - Message Delete Timeout: ${this.messageDeleteTimeout}ms
+  - Screen Refresh Interval: ${this.screenRefreshInterval}ms
+  - Screen Refresh Max Count: ${this.screenRefreshMaxCount}
+  - Bot Token Monitor Interval: ${this.botTokenMonitorInterval}ms`;
     }
 }

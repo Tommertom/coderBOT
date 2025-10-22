@@ -31,11 +31,12 @@ interface BotWorker {
 }
 
 const botWorkers: BotWorker[] = [];
+let monitorInterval: NodeJS.Timeout | null = null;
 
 // Get bot tokens from config
-const botTokens = globalConfig.getTelegramBotTokens();
+let currentBotTokens = globalConfig.getTelegramBotTokens();
 
-console.log(`[Parent] Found ${botTokens.length} bot token(s)`);
+console.log(`[Parent] Found ${currentBotTokens.length} bot token(s)`);
 
 /**
  * Spawn a bot worker process
@@ -101,8 +102,8 @@ function spawnBotWorker(token: string, index: number): BotWorker {
 async function startBotWorkers() {
     try {
         // Spawn a worker for each bot token
-        for (let i = 0; i < botTokens.length; i++) {
-            const worker = spawnBotWorker(botTokens[i], i);
+        for (let i = 0; i < currentBotTokens.length; i++) {
+            const worker = spawnBotWorker(currentBotTokens[i], i);
             botWorkers.push(worker);
 
             // Add small delay between spawns to avoid overwhelming the system
@@ -113,6 +114,100 @@ async function startBotWorkers() {
     } catch (error) {
         console.error('[Parent] Failed to start bot workers:', error);
         process.exit(1);
+    }
+}
+
+/**
+ * Check for changes in bot tokens and update workers accordingly
+ */
+async function checkBotTokenChanges(): Promise<void> {
+    try {
+        console.log('[Parent] Checking for bot token changes...');
+        
+        // Reload environment variables
+        dotenv.config();
+        
+        // Create new config to get updated tokens
+        const newConfig = new ConfigService();
+        const newBotTokens = newConfig.getTelegramBotTokens();
+        
+        // Find tokens that were removed
+        const removedTokens = currentBotTokens.filter(token => !newBotTokens.includes(token));
+        
+        // Find tokens that were added
+        const addedTokens = newBotTokens.filter(token => !currentBotTokens.includes(token));
+        
+        if (removedTokens.length === 0 && addedTokens.length === 0) {
+            console.log('[Parent] No bot token changes detected');
+            return;
+        }
+        
+        console.log(`[Parent] Token changes detected: ${addedTokens.length} added, ${removedTokens.length} removed`);
+        
+        // Kill workers for removed tokens
+        for (const removedToken of removedTokens) {
+            const workerIndex = botWorkers.findIndex(w => w.token === removedToken);
+            if (workerIndex !== -1) {
+                const worker = botWorkers[workerIndex];
+                console.log(`[Parent] Killing bot worker ${worker.botIndex} (token removed)`);
+                worker.process.kill('SIGTERM');
+                botWorkers.splice(workerIndex, 1);
+            }
+        }
+        
+        // Spawn workers for added tokens
+        for (const addedToken of addedTokens) {
+            // Check if this token is already running (shouldn't happen but safety check)
+            if (botWorkers.some(w => w.token === addedToken)) {
+                console.log(`[Parent] Token already has a running worker, skipping`);
+                continue;
+            }
+            
+            // Find next available index
+            const nextIndex = botWorkers.length;
+            console.log(`[Parent] Spawning new bot worker for added token (index ${nextIndex})`);
+            const worker = spawnBotWorker(addedToken, nextIndex);
+            botWorkers.push(worker);
+            
+            // Add small delay between spawns
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        // Update current tokens
+        currentBotTokens = newBotTokens;
+        
+        console.log(`[Parent] ✅ Bot workers updated: ${botWorkers.length} total worker(s)`);
+    } catch (error) {
+        console.error('[Parent] Error checking bot token changes:', error);
+    }
+}
+
+/**
+ * Start monitoring for bot token changes
+ */
+function startBotTokenMonitoring(): void {
+    const monitorIntervalMs = globalConfig.getBotTokenMonitorInterval();
+    
+    if (monitorIntervalMs <= 0) {
+        console.log('[Parent] Bot token monitoring is disabled');
+        return;
+    }
+    
+    console.log(`[Parent] Starting bot token monitoring (interval: ${monitorIntervalMs}ms)`);
+    
+    monitorInterval = setInterval(() => {
+        checkBotTokenChanges();
+    }, monitorIntervalMs);
+}
+
+/**
+ * Stop monitoring for bot token changes
+ */
+function stopBotTokenMonitoring(): void {
+    if (monitorInterval) {
+        clearInterval(monitorInterval);
+        monitorInterval = null;
+        console.log('[Parent] Bot token monitoring stopped');
     }
 }
 
@@ -129,6 +224,9 @@ async function gracefulShutdown(signal: string): Promise<void> {
 
     shuttingDown = true;
     console.log(`[Parent] Received ${signal}, shutting down gracefully...`);
+
+    // Stop monitoring
+    stopBotTokenMonitoring();
 
     // Send SIGTERM to all child processes
     const shutdownPromises = botWorkers.map((worker) => {
@@ -179,4 +277,7 @@ process.on('uncaughtException', (error) => {
 // Start all bot workers
 startBotWorkers().then(() => {
     console.log(`[Parent] ✅ CoderBot parent process ready with ${botWorkers.length} worker(s)`);
+    
+    // Start monitoring for token changes
+    startBotTokenMonitoring();
 }).catch(console.error);

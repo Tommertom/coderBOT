@@ -45,3 +45,18 @@ CLEAN_UP_MEDIADIR=false
 # Time to wait before automatically deleting confirmation messages
 # Set to 0 to disable auto-deletion of messages
 MESSAGE_DELETE_TIMEOUT=10000
+
+# Auto-refresh Configuration
+# Automatically refresh the last shown terminal screenshot after sending commands
+# Refresh interval in milliseconds (default: 5000 = 5 seconds)
+SCREEN_REFRESH_INTERVAL=5000
+
+# Maximum number of automatic refreshes (default: 5)
+# Total auto-refresh duration = SCREEN_REFRESH_INTERVAL * SCREEN_REFRESH_MAX_COUNT
+SCREEN_REFRESH_MAX_COUNT=5
+
+# Bot Token Monitoring
+# Monitor .env file for changes to bot tokens and dynamically spawn/kill workers
+# Check interval in milliseconds (default: 300000 = 5 minutes)
+# Set to 0 to disable monitoring
+BOT_TOKEN_MONITOR_INTERVAL=300000

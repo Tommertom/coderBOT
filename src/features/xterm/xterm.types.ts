@@ -9,6 +9,8 @@ export interface PtySession {
     chatId: number;
     onDataCallback?: (userId: string, chatId: number, data: string) => void;
     lastScreenshotMessageId?: number;
+    refreshInterval?: NodeJS.Timeout;
+    discoveredUrls?: Set<string>;
 }
 
 export interface XtermSession {

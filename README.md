@@ -45,6 +45,8 @@ coderbot
 - ⌨️ **Full Keyboard Control**: Send any key combination including all control characters (Ctrl+A through Ctrl+Z, special keys)
 - 🔄 **Session Management**: Multiple concurrent sessions with automatic timeout handling
 - 🎯 **Interactive Menu Support**: Number key support for navigating CLI tool menus
+- 🔗 **URL Tracking**: Automatically detects and stores all URLs from terminal output
+- ⚡ **Quick Commands**: Dot prefix (`.command`) for faster command entry
 
 ## Configuration
 
@@ -104,6 +106,21 @@ CLEAN_UP_MEDIADIR=false
 # Time in milliseconds before auto-deleting confirmation messages (default: 10000 = 10 seconds)
 # Set to 0 to disable auto-deletion
 MESSAGE_DELETE_TIMEOUT=10000
+
+# Auto-refresh Configuration (Optional)
+# Automatically refresh the last shown terminal screenshot after sending commands
+# Refresh interval in milliseconds (default: 5000 = 5 seconds)
+SCREEN_REFRESH_INTERVAL=5000
+
+# Maximum number of automatic refreshes (default: 5)
+# Total auto-refresh duration = SCREEN_REFRESH_INTERVAL * SCREEN_REFRESH_MAX_COUNT
+SCREEN_REFRESH_MAX_COUNT=5
+
+# Bot Token Monitoring (Optional)
+# Monitor .env file for changes to bot tokens and dynamically spawn/kill workers
+# Check interval in milliseconds (default: 300000 = 5 minutes)
+# Set to 0 to disable monitoring
+BOT_TOKEN_MONITOR_INTERVAL=300000
 ```
 
 **Finding Your Telegram User ID:**
@@ -307,6 +324,7 @@ Example log output:
 
 ### Sending Text to Terminal
 - **Regular text messages** - Sent directly to terminal with Enter
+- **`.command`** - Quick command (dot prefix removed, Enter added automatically)
 - `/send <text>` - Send text to terminal with Enter
 - `/keys <text>` - Send text without pressing Enter
 - **Tip:** Use `[media]` in your commands - it's replaced with the media directory path
@@ -343,10 +361,34 @@ Common examples:
 
 ### Viewing Output
 - `/screen` - Capture and view terminal screenshot
+- `/urls` - Show all URLs discovered in terminal output
 - Click **🔄 Refresh** button on screenshots to update the view
 
 ### Administrative
 - `/killbot` - Shutdown the bot (emergency stop)
+
+## Quick Reference
+
+### Dot Command Prefix
+Send commands quickly by prefixing with a dot:
+```
+.ls -la          → sends: ls -la + Enter
+.git status      → sends: git status + Enter  
+.npm start       → sends: npm start + Enter
+```
+The dot is removed and Enter is automatically pressed. This is faster than typing `/send` every time.
+
+### URL Tracking
+The bot automatically captures all URLs from terminal output:
+```
+You: .npm run dev
+Bot: [Terminal shows: Server running at http://localhost:3000]
+
+You: /urls
+Bot: 🔗 Discovered URLs (1)
+     `http://localhost:3000`
+```
+URLs persist throughout the session and can be retrieved anytime with `/urls`.
 
 ## How to Use
 

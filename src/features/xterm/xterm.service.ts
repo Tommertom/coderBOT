@@ -1,6 +1,7 @@
 import * as pty from 'node-pty';
 import { PtySession, XtermConfig } from './xterm.types.js';
 import { ConfigService } from '../../services/config.service.js';
+import { UrlExtractionUtils } from '../../utils/url-extraction.utils.js';
 
 export class XtermService {
     private sessions: Map<string, PtySession> = new Map();
@@ -47,6 +48,7 @@ export class XtermService {
                 cols: this.config.terminalCols,
                 chatId,
                 onDataCallback,
+                discoveredUrls: new Set<string>(),
             };
 
             ptyProcess.onData((data) => {
@@ -55,6 +57,10 @@ export class XtermService {
                     session.output.shift();
                 }
                 session.lastActivity = new Date();
+
+                // Extract and store URLs from terminal output
+                const urls = UrlExtractionUtils.extractUrlsFromTerminalOutput(data);
+                urls.forEach(url => session.discoveredUrls?.add(url));
 
                 // Pass all data to the callback if provided
                 if (session.onDataCallback) {
@@ -142,6 +148,10 @@ export class XtermService {
             throw new Error('No active session found');
         }
 
+        if (session.refreshInterval) {
+            clearInterval(session.refreshInterval);
+        }
+
         try {
             session.pty.kill();
         } catch (error) {
@@ -165,6 +175,34 @@ export class XtermService {
     getLastScreenshotMessageId(userId: string): number | undefined {
         const session = this.sessions.get(this.getSessionKey(userId));
         return session?.lastScreenshotMessageId;
+    }
+
+    setRefreshInterval(userId: string, interval: NodeJS.Timeout): void {
+        const session = this.sessions.get(this.getSessionKey(userId));
+        if (session) {
+            session.refreshInterval = interval;
+        }
+    }
+
+    getRefreshInterval(userId: string): NodeJS.Timeout | undefined {
+        const session = this.sessions.get(this.getSessionKey(userId));
+        return session?.refreshInterval;
+    }
+
+    clearRefreshInterval(userId: string): void {
+        const session = this.sessions.get(this.getSessionKey(userId));
+        if (session?.refreshInterval) {
+            clearInterval(session.refreshInterval);
+            session.refreshInterval = undefined;
+        }
+    }
+
+    getDiscoveredUrls(userId: string): string[] {
+        const session = this.sessions.get(this.getSessionKey(userId));
+        if (!session?.discoveredUrls) {
+            return [];
+        }
+        return Array.from(session.discoveredUrls);
     }
 
     private startTimeoutChecker(): void {

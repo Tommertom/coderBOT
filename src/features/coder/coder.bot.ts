@@ -6,6 +6,7 @@ import { ConfigService } from '../../services/config.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
 import { MessageUtils } from '../../utils/message.utils.js';
 import { ErrorUtils } from '../../utils/error.utils.js';
+import { ScreenRefreshUtils } from '../../utils/screen-refresh.utils.js';
 import { Messages, SuccessMessages, ErrorActions } from '../../constants/messages.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -62,6 +63,7 @@ export class CoderBot {
         bot.command('send', AccessControlMiddleware.requireAccess, this.handleSend.bind(this));
         bot.command('close', AccessControlMiddleware.requireAccess, this.handleClose.bind(this));
         bot.command('killbot', AccessControlMiddleware.requireAccess, this.handleKillbot.bind(this));
+        bot.command('urls', AccessControlMiddleware.requireAccess, this.handleUrls.bind(this));
         bot.on('callback_query:data', AccessControlMiddleware.requireAccess, this.handleCallbackQuery.bind(this));
         bot.on('message:photo', AccessControlMiddleware.requireAccess, this.handlePhoto.bind(this));
         bot.on('message:text', AccessControlMiddleware.requireAccess, this.handleTextMessage.bind(this));
@@ -297,10 +299,14 @@ export class CoderBot {
     }
 
     private async handleTextMessage(ctx: Context, next: () => Promise<void>): Promise<void> {
-        const text = ctx.message?.text || '';
+        let text = ctx.message?.text || '';
 
         if (text.startsWith('/')) {
             return next();
+        }
+
+        if (text.startsWith('.')) {
+            text = text.substring(1);
         }
 
         const userId = ctx.from!.id.toString();
@@ -323,6 +329,18 @@ export class CoderBot {
             const sentMsg = await ctx.reply(`✅ Sent - ${Messages.VIEW_SCREEN_HINT}`);
 
             await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+
+            // Start auto-refresh if last screen exists
+            if (this.bot) {
+                ScreenRefreshUtils.startAutoRefresh(
+                    userId,
+                    chatId,
+                    this.bot,
+                    this.xtermService,
+                    this.xtermRendererService,
+                    this.configService
+                );
+            }
         } catch (error) {
             await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
         }
@@ -443,6 +461,18 @@ export class CoderBot {
             const sentMsg = await ctx.reply(`✅ Sent - ${Messages.VIEW_SCREEN_HINT}`);
 
             await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+
+            // Start auto-refresh if last screen exists
+            if (this.bot) {
+                ScreenRefreshUtils.startAutoRefresh(
+                    userId,
+                    chatId,
+                    this.bot,
+                    this.xtermService,
+                    this.xtermRendererService,
+                    this.configService
+                );
+            }
         } catch (error) {
             await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
         }
@@ -502,6 +532,7 @@ export class CoderBot {
             '/xterm - Start a raw bash terminal session\n' +
             '*Sending Text to Terminal:*\n' +
             'Type any message (not starting with /) - Sent directly to terminal with Enter\n' +
+            '.command - Send command (dot prefix removed, Enter added automatically)\n' +
             '/send <text> - Send text to terminal with Enter\n' +
             '/keys <text> - Send text without pressing Enter\n' +
             '*Tip:* Use \\[media\\] in your text - it will be replaced with the media directory path\n\n' +
@@ -513,9 +544,12 @@ export class CoderBot {
             '/ctrlc - Send Ctrl+C (interrupt)\n' +
             '/ctrlx - Send Ctrl+X\n' +
             '/esc - Send Escape key\n' +
+            '/arrowup - Send Arrow Up key\n' +
+            '/arrowdown - Send Arrow Down key\n' +
             '/1 /2 /3 /4 /5 - Send number keys (for menu selections)\n\n' +
             '*Viewing Output:*\n' +
             '/screen - Capture and view terminal screenshot\n' +
+            '/urls - Show all URLs found in terminal output\n' +
             'Click 🔄 Refresh button on screenshots to update\n\n' +
             '*Media:*\n' +
             '• Upload photos or files - Automatically saved to received directory and available to the coder agent\n' +
@@ -531,6 +565,38 @@ export class CoderBot {
         );
 
         await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 2);
+    }
+
+    private async handleUrls(ctx: Context): Promise<void> {
+        const userId = ctx.from!.id.toString();
+
+        try {
+            if (!this.xtermService.hasSession(userId)) {
+                await ctx.reply(Messages.NO_ACTIVE_SESSION);
+                return;
+            }
+
+            const urls = this.xtermService.getDiscoveredUrls(userId);
+
+            if (urls.length === 0) {
+                await ctx.reply(
+                    '🔗 *No URLs Found*\n\n' +
+                    'No URLs have been detected in the terminal output yet.',
+                    { parse_mode: 'Markdown' }
+                );
+                return;
+            }
+
+            const urlList = urls.map(url => `\`${url}\``).join('\n');
+            const sentMsg = await ctx.reply(
+                `🔗 *Discovered URLs* (${urls.length})\n\n${urlList}`,
+                { parse_mode: 'Markdown' }
+            );
+
+            await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+        } catch (error) {
+            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
+        }
     }
 
     private async handleKillbot(ctx: Context): Promise<void> {

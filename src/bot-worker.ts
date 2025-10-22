@@ -103,10 +103,11 @@ async function startWorker() {
             { command: 'screen', description: 'Capture and view terminal screenshot' },
             { command: 'help', description: 'Show complete command reference' },
             { command: 'tab', description: 'Send Tab character' },
+            { command: 'enter', description: 'Send Enter key' },
+            { command: 'ctrlc', description: 'Send Ctrl+C (interrupt)' },
             { command: 'copilot', description: 'Start a new terminal session with Copilot' },
             { command: 'claude', description: 'Start a new terminal session with Claude' },
             { command: 'cursor', description: 'Start a new terminal session with Cursor' },
-            { command: 'enter', description: 'Send Enter key' },
             { command: 'start', description: 'Show help message with all commands' },
             { command: 'close', description: 'Close the current terminal session' },
         ]);
