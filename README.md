@@ -22,6 +22,35 @@ npm install -g @tommertom/coderbot
 coderbot
 ```
 
+## Platform Compatibility
+
+### Linux / macOS
+✅ Fully supported - works out of the box
+
+### Windows
+⚠️ **Limited Support** - CoderBOT uses `node-pty` which requires native compilation on Windows.
+
+**Windows Requirements:**
+- Visual Studio Build Tools (C++ compiler)
+- Python (for node-gyp)
+- Windows SDK
+
+**Installation on Windows:**
+```cmd
+# Install build tools (run as Administrator)
+npm install -g windows-build-tools
+
+# Then install CoderBOT
+npm install -g @tommertom/coderbot
+```
+
+**Recommended for Windows Users:**
+1. **Docker** (easiest) - See [DOCKER_GUIDE.md](DOCKER_GUIDE.md)
+2. **WSL2** (Windows Subsystem for Linux) - Full Linux compatibility
+3. **Git Bash** or **PowerShell** with build tools installed
+
+If you encounter installation errors on Windows, Docker or WSL2 are the most reliable options.
+
 ## Features
 
 - 🖥️ **Interactive Terminal**: Full xterm terminal access via Telegram with PTY support

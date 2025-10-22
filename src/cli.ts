@@ -16,6 +16,17 @@ const __dirname = dirname(__filename);
 console.log('🤖 CoderBOT - AI-Powered Telegram Terminal Bot');
 console.log('================================================\n');
 
+// Windows compatibility warning
+if (process.platform === 'win32') {
+    console.log('⚠️  Windows Compatibility Notice:');
+    console.log('   CoderBOT uses node-pty which requires native compilation.');
+    console.log('   You may need to install:');
+    console.log('   1. Windows Build Tools: npm install -g windows-build-tools');
+    console.log('   2. Python (for node-gyp)');
+    console.log('   OR use WSL2 (Windows Subsystem for Linux) for better compatibility.\n');
+    console.log('   Docker is recommended for Windows users.\n');
+}
+
 // Check if .env file exists in current directory
 const envPath = join(process.cwd(), '.env');
 const templatePath = join(__dirname, '..', 'dot-env.template');
@@ -58,9 +69,15 @@ console.log('🚀 Starting CoderBOT...\n');
 
 // Start the main application
 const appPath = join(__dirname, 'app.js');
+
+// Windows-compatible process spawning
+const isWindows = process.platform === 'win32';
 const child = spawn('node', [appPath], {
     stdio: 'inherit',
-    env: { ...process.env, NODE_ENV: 'production' }
+    env: { ...process.env, NODE_ENV: 'production' },
+    // On Windows, we need shell: false for proper signal handling
+    shell: false,
+    windowsHide: true
 });
 
 child.on('exit', (code) => {
@@ -70,6 +87,37 @@ child.on('exit', (code) => {
     }
 });
 
-// Forward signals to child process
-process.on('SIGINT', () => child.kill('SIGINT'));
-process.on('SIGTERM', () => child.kill('SIGTERM'));
+child.on('error', (err) => {
+    console.error(`\n❌ Failed to start CoderBOT: ${err.message}`);
+    process.exit(1);
+});
+
+// Cross-platform signal handling
+if (isWindows) {
+    // On Windows, use readline to handle Ctrl+C
+    if (process.stdin.isTTY) {
+        const readline = require('readline');
+        readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+        });
+    }
+    
+    // Windows doesn't support POSIX signals properly, just kill the child
+    process.on('SIGINT', () => {
+        child.kill();
+        process.exit(0);
+    });
+    process.on('SIGTERM', () => {
+        child.kill();
+        process.exit(0);
+    });
+    process.on('SIGBREAK', () => {
+        child.kill();
+        process.exit(0);
+    });
+} else {
+    // Unix-like systems support proper signal forwarding
+    process.on('SIGINT', () => child.kill('SIGINT'));
+    process.on('SIGTERM', () => child.kill('SIGTERM'));
+}
