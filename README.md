@@ -31,7 +31,7 @@ coderbot
 ❌ **Not Supported** - CoderBOT uses `node-pty` which requires native compilation.
 
 **Windows Users: Please use Docker**
-- See [DOCKER_GUIDE.md](DOCKER_GUIDE.md) for setup instructions
+- See [DOCKER_README.md](DOCKER_README.md) for setup instructions
 - Docker provides full compatibility without build tool requirements
 
 
@@ -177,7 +177,7 @@ coderbot
 
 ```bash
 # Create docker-compose.yml and .env files
-# (See DOCKER_GUIDE.md for examples)
+# (See DOCKER_README.md for examples)
 
 # Create and configure .env
 nano .env  # Edit with your configuration
@@ -189,7 +189,7 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
-See [DOCKER_GUIDE.md](DOCKER_GUIDE.md) for detailed Docker setup instructions including example docker-compose.yml.
+See [DOCKER_README.md](DOCKER_README.md) for detailed Docker setup instructions including example docker-compose.yml.
 
 ### Configuration
 
