@@ -1,5 +1,8 @@
 import { fork, ChildProcess } from 'child_process';
 import { ConfigService } from './services/config.service.js';
+import { ProcessManager } from './services/process-manager.service.js';
+import { ConfigManager } from './services/config-manager.service.js';
+import { ControlBot } from './features/control/control.bot.js';
 import dotenv from 'dotenv';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -13,6 +16,9 @@ dotenv.config();
 
 // Initialize global config service
 const globalConfig = new ConfigService();
+const processManager = new ProcessManager();
+const configManager = new ConfigManager('.env');
+let controlBot: ControlBot | null = null;
 
 try {
     globalConfig.validate();
@@ -211,6 +217,68 @@ function stopBotTokenMonitoring(): void {
     }
 }
 
+/**
+ * Initialize and start the Control Bot if configured
+ */
+async function initializeControlBot(): Promise<void> {
+    if (!globalConfig.hasControlBot()) {
+        console.log('[Parent] Control bot not configured, skipping...');
+        return;
+    }
+
+    const token = globalConfig.getControlBotToken();
+    const adminIds = globalConfig.getControlBotAdminIds();
+
+    if (!token) {
+        console.log('[Parent] No control bot token found');
+        return;
+    }
+
+    if (adminIds.length === 0) {
+        console.warn('[Parent] Warning: Control bot token set but no admin IDs configured');
+        return;
+    }
+
+    try {
+        await configManager.initialize();
+        
+        controlBot = new ControlBot(
+            token,
+            processManager,
+            configManager,
+            globalConfig
+        );
+
+        await controlBot.start();
+        console.log(`[Parent] ✅ ControlBOT started successfully with ${adminIds.length} admin(s)`);
+    } catch (error) {
+        console.error('[Parent] Failed to start ControlBOT:', error);
+    }
+}
+
+/**
+ * Start all bot workers using ProcessManager
+ */
+async function startBotWorkersWithProcessManager() {
+    try {
+        const tokens = globalConfig.getTelegramBotTokens();
+        console.log(`[Parent] Starting ${tokens.length} bot worker(s) via ProcessManager...`);
+        
+        for (let i = 0; i < tokens.length; i++) {
+            const botId = `bot-${i + 1}`;
+            await processManager.startBot(botId, tokens[i]);
+            
+            // Small delay between spawns
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        console.log(`[Parent] ✅ All ${tokens.length} bot worker(s) started`);
+    } catch (error) {
+        console.error('[Parent] Failed to start bot workers:', error);
+        process.exit(1);
+    }
+}
+
 let shuttingDown = false;
 
 /**
@@ -225,10 +293,20 @@ async function gracefulShutdown(signal: string): Promise<void> {
     shuttingDown = true;
     console.log(`[Parent] Received ${signal}, shutting down gracefully...`);
 
+    // Stop control bot
+    if (controlBot) {
+        console.log('[Parent] Stopping ControlBOT...');
+        await controlBot.stop();
+    }
+
     // Stop monitoring
     stopBotTokenMonitoring();
 
-    // Send SIGTERM to all child processes
+    // Stop all worker bots via ProcessManager
+    console.log('[Parent] Stopping all worker bots...');
+    await processManager.stopAllBots();
+
+    // Also stop old workers if any
     const shutdownPromises = botWorkers.map((worker) => {
         return new Promise<void>((resolve) => {
             if (worker.process.killed) {
@@ -238,12 +316,11 @@ async function gracefulShutdown(signal: string): Promise<void> {
 
             console.log(`[Parent] Sending shutdown signal to bot worker ${worker.botIndex}`);
 
-            // Set timeout for forced kill
             const timeout = setTimeout(() => {
                 console.log(`[Parent] Force killing bot worker ${worker.botIndex}`);
                 worker.process.kill('SIGKILL');
                 resolve();
-            }, 10000); // 10 second timeout
+            }, 10000);
 
             worker.process.once('exit', () => {
                 clearTimeout(timeout);
@@ -275,8 +352,14 @@ process.on('uncaughtException', (error) => {
 });
 
 // Start all bot workers
-startBotWorkers().then(() => {
+startBotWorkers().then(async () => {
     console.log(`[Parent] ✅ CoderBot parent process ready with ${botWorkers.length} worker(s)`);
+    
+    // Start new ProcessManager-based workers
+    await startBotWorkersWithProcessManager();
+    
+    // Initialize Control Bot
+    await initializeControlBot();
     
     // Start monitoring for token changes
     startBotTokenMonitoring();

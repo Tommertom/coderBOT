@@ -5,6 +5,7 @@ import { ServiceContainerFactory } from './services/service-container.factory.js
 import { createMediaWatcherService } from './features/media/media-watcher.service.js';
 import { AccessControlMiddleware } from './middleware/access-control.middleware.js';
 import { ConfigService } from './services/config.service.js';
+import { IPCMessage, IPCMessageType } from './types/ipc.types.js';
 import dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -127,12 +128,83 @@ async function startWorker() {
 }
 
 /**
+ * Handle IPC messages from parent process
+ */
+function handleIPCMessage(message: IPCMessage): void {
+    switch (message.type) {
+        case IPCMessageType.HEALTH_CHECK:
+            sendHealthResponse();
+            break;
+        case IPCMessageType.SHUTDOWN:
+            console.log(`[Worker ${botId}] Received shutdown command from parent`);
+            gracefulShutdown('IPC_SHUTDOWN');
+            break;
+        default:
+            console.log(`[Worker ${botId}] Received unknown IPC message:`, message.type);
+    }
+}
+
+/**
+ * Send health response to parent
+ */
+function sendHealthResponse(): void {
+    if (process.send) {
+        const response: IPCMessage = {
+            type: IPCMessageType.HEALTH_RESPONSE,
+            botId,
+            data: {
+                healthy: true,
+                uptime: process.uptime() * 1000,
+                memoryUsage: process.memoryUsage(),
+            },
+            timestamp: new Date(),
+        };
+        process.send(response);
+    }
+}
+
+/**
+ * Send status update to parent
+ */
+function sendStatusUpdate(status: string, data?: any): void {
+    if (process.send) {
+        const message: IPCMessage = {
+            type: IPCMessageType.STATUS_UPDATE,
+            botId,
+            data: { status, ...data },
+            timestamp: new Date(),
+        };
+        process.send(message);
+    }
+}
+
+/**
+ * Send log message to parent
+ */
+function sendLogMessage(message: string): void {
+    if (process.send) {
+        const ipcMessage: IPCMessage = {
+            type: IPCMessageType.LOG_MESSAGE,
+            botId,
+            data: message,
+            timestamp: new Date(),
+        };
+        process.send(ipcMessage);
+    }
+}
+
+// Listen for IPC messages from parent
+process.on('message', handleIPCMessage);
+
+/**
  * Graceful shutdown handler for cleanup on process termination
  */
 async function gracefulShutdown(signal: string): Promise<void> {
     console.log(`[Worker ${botId}] Received ${signal}, shutting down gracefully...`);
 
     try {
+        sendStatusUpdate('stopping');
+        
         // Cleanup media watcher
         mediaWatcherService.cleanup();
 
@@ -143,6 +215,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
         await bot.stop();
 
         console.log(`[Worker ${botId}] ✅ Shutdown complete`);
+        sendStatusUpdate('stopped');
         process.exit(0);
     } catch (error) {
         console.error(`[Worker ${botId}] Error during shutdown:`, error);

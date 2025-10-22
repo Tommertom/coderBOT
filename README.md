@@ -47,6 +47,7 @@ coderbot
 - 🎯 **Interactive Menu Support**: Number key support for navigating CLI tool menus
 - 🔗 **URL Tracking**: Automatically detects and stores all URLs from terminal output
 - ⚡ **Quick Commands**: Dot prefix (`.command`) for faster command entry
+- 🎮 **ControlBOT**: Administrative bot for managing worker processes (start/stop bots, add/remove tokens, monitor health)
 
 ## Configuration
 
@@ -389,6 +390,49 @@ Bot: 🔗 Discovered URLs (1)
      `http://localhost:3000`
 ```
 URLs persist throughout the session and can be retrieved anytime with `/urls`.
+
+## ControlBOT - Administrative Bot
+
+ControlBOT is an optional administrative bot that runs in the parent process and provides powerful management capabilities for all worker bot processes.
+
+### Setup
+
+1. Create a new bot with [@BotFather](https://t.me/BotFather)
+2. Add to your `.env`:
+   ```env
+   CONTROL_BOT_TOKEN=your_control_bot_token
+   CONTROL_BOT_ADMIN_IDS=your_telegram_user_id
+   ```
+3. Restart the application
+
+### Commands
+
+**Process Management:**
+- `/status` - Show status of all worker bots
+- `/start <bot-id>` - Start a specific bot
+- `/stop <bot-id>` - Stop a specific bot
+- `/restart <bot-id>` - Restart a specific bot
+- `/stopall` - Stop all running bots
+- `/startall` - Start all stopped bots
+- `/restartall` - Restart all bots
+
+**Bot Configuration:**
+- `/listbots` - List all configured bots
+- `/addbot <token>` - Add and start a new bot
+- `/removebot <bot-id>` - Remove a bot
+- `/reload` - Reload .env configuration
+
+**Monitoring:**
+- `/logs <bot-id> [lines]` - Show bot logs
+- `/health` - Health check for all bots
+- `/uptime` - Show uptime for all bots
+
+**Administrative:**
+- `/shutdown` - Shutdown entire system
+
+### Learn More
+
+See [ControlBOT Documentation](./docs/control-bot/README.md) for detailed usage guide and examples.
 
 ## How to Use
 

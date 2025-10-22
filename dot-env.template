@@ -60,3 +60,15 @@ SCREEN_REFRESH_MAX_COUNT=5
 # Check interval in milliseconds (default: 300000 = 5 minutes)
 # Set to 0 to disable monitoring
 BOT_TOKEN_MONITOR_INTERVAL=300000
+
+# ============================================================================
+# Control Bot Configuration (Optional)
+# ============================================================================
+# Administrative bot for managing worker bot processes
+# If not set, controlBOT will not be instantiated
+CONTROL_BOT_TOKEN=
+
+# Control Bot Access (Required if CONTROL_BOT_TOKEN is set)
+# Comma-separated list of Telegram User IDs who can use the control bot
+# Example: CONTROL_BOT_ADMIN_IDS=123456789,987654321
+CONTROL_BOT_ADMIN_IDS=

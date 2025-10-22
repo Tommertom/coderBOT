@@ -31,6 +31,10 @@ export class ConfigService {
     // Bot Token Monitoring
     private readonly botTokenMonitorInterval: number;
 
+    // Control Bot Configuration
+    private readonly controlBotToken: string | undefined;
+    private readonly controlBotAdminIds: number[];
+
     // System Environment
     private readonly homeDirectory: string;
     private readonly systemEnv: { [key: string]: string };
@@ -76,6 +80,16 @@ export class ConfigService {
 
         // Load bot token monitoring configuration
         this.botTokenMonitorInterval = parseInt(process.env.BOT_TOKEN_MONITOR_INTERVAL || '300000', 10);
+
+        // Load control bot configuration
+        this.controlBotToken = process.env.CONTROL_BOT_TOKEN || undefined;
+        const controlAdminIds = process.env.CONTROL_BOT_ADMIN_IDS || '';
+        this.controlBotAdminIds = controlAdminIds
+            .split(',')
+            .map(id => id.trim())
+            .filter(id => id.length > 0)
+            .map(id => parseInt(id, 10))
+            .filter(id => !isNaN(id));
 
         // Load system environment
         this.homeDirectory = process.env.HOME || '/tmp';
@@ -144,6 +158,19 @@ export class ConfigService {
         return this.botTokenMonitorInterval;
     }
 
+    // Control Bot Configuration Getters
+    getControlBotToken(): string | undefined {
+        return this.controlBotToken;
+    }
+
+    getControlBotAdminIds(): number[] {
+        return [...this.controlBotAdminIds];
+    }
+
+    hasControlBot(): boolean {
+        return !!this.controlBotToken && this.controlBotToken.length > 0;
+    }
+
     // System Environment Getters
     getHomeDirectory(): string {
         return this.homeDirectory;
@@ -162,6 +189,10 @@ export class ConfigService {
         if (this.allowedUserIds.length === 0) {
             console.warn('Warning: No allowed user IDs configured. Consider setting ALLOWED_USER_IDS.');
         }
+
+        if (this.hasControlBot() && this.controlBotAdminIds.length === 0) {
+            console.warn('Warning: Control bot token set but no admin IDs configured. Set CONTROL_BOT_ADMIN_IDS.');
+        }
     }
 
     // Debug information
@@ -179,6 +210,8 @@ export class ConfigService {
   - Message Delete Timeout: ${this.messageDeleteTimeout}ms
   - Screen Refresh Interval: ${this.screenRefreshInterval}ms
   - Screen Refresh Max Count: ${this.screenRefreshMaxCount}
-  - Bot Token Monitor Interval: ${this.botTokenMonitorInterval}ms`;
+  - Bot Token Monitor Interval: ${this.botTokenMonitorInterval}ms
+  - Control Bot Enabled: ${this.hasControlBot()}
+  - Control Bot Admins: ${this.controlBotAdminIds.length}`;
     }
 }
