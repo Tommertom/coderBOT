@@ -1,14 +1,13 @@
-import { Bot } from "grammy";
-import { XtermBot } from './features/xterm/xterm.bot.js';
-import { CoderBot } from './features/coder/coder.bot.js';
-import { ServiceContainerFactory } from './services/service-container.factory.js';
-import { ServiceContainer } from './services/service-container.interface.js';
-import { createMediaWatcherService } from './features/media/media-watcher.service.js';
-import { AccessControlMiddleware } from './middleware/access-control.middleware.js';
+import { fork, ChildProcess } from 'child_process';
 import { ConfigService } from './services/config.service.js';
 import dotenv from 'dotenv';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 
-console.log('Starting CoderBot...')
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+console.log('[Parent] Starting CoderBot parent process...');
 
 dotenv.config();
 
@@ -17,131 +16,148 @@ const globalConfig = new ConfigService();
 
 try {
     globalConfig.validate();
-    console.log('Configuration loaded successfully');
+    console.log('[Parent] Configuration loaded successfully');
     console.log(globalConfig.getDebugInfo());
 } catch (error) {
-    console.error('Configuration error:', error);
+    console.error('[Parent] Configuration error:', error);
     process.exit(1);
 }
 
-interface BotInstance {
-    bot: Bot;
-    services: ServiceContainer;
-    xtermBot: XtermBot;
-    coderBot: CoderBot;
+interface BotWorker {
+    process: ChildProcess;
+    botIndex: string;
+    token: string;
+    ready: boolean;
 }
+
+const botWorkers: BotWorker[] = [];
 
 // Get bot tokens from config
 const botTokens = globalConfig.getTelegramBotTokens();
 
-console.log(`Found ${botTokens.length} bot token(s)`);
+console.log(`[Parent] Found ${botTokens.length} bot token(s)`);
 
-// Create bot instances for all tokens
-const bots: Bot[] = botTokens.map((token, index) => {
-    console.log(`Creating bot instance ${index + 1}/${botTokens.length}`);
-    return new Bot(token);
-});
+/**
+ * Spawn a bot worker process
+ */
+function spawnBotWorker(token: string, index: number): BotWorker {
+    const botIndex = index.toString();
+    const workerPath = path.join(__dirname, 'bot-worker.js');
 
-const botInstances: BotInstance[] = [];
+    console.log(`[Parent] Spawning bot worker ${botIndex}...`);
 
-// Initialize media watcher service with config
-const mediaWatcherService = createMediaWatcherService(globalConfig);
+    const childProcess = fork(workerPath, [], {
+        env: {
+            ...process.env,
+            BOT_TOKEN: token,
+            BOT_INDEX: botIndex,
+        },
+        stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
+    });
 
-async function startBot() {
-    try {
-        // Set config service for access control
-        AccessControlMiddleware.setConfigService(globalConfig);
+    const worker: BotWorker = {
+        process: childProcess,
+        botIndex,
+        token,
+        ready: false,
+    };
 
-        // Set bot instances for access control
-        AccessControlMiddleware.setBotInstances(bots);
-
-        // Initialize media watcher with all bots
-        await mediaWatcherService.initialize(bots);
-
-        // Initialize each bot
-        for (let i = 0; i < bots.length; i++) {
-            const bot = bots[i];
-            const token = botTokens[i];
-            console.log(`Initializing bot ${i + 1}/${bots.length}...`);
-
-            // Set global error handler to prevent crashes
-            bot.catch((err) => {
-                const ctx = err.ctx;
-                console.error(`[Bot ${i + 1}] Error while handling update ${ctx.update.update_id}:`, err.error);
-            });
-
-            // Get bot info to use as identifier
-            const botInfo = await bot.api.getMe();
-            const botId = botInfo.id.toString();
-
-            // Create per-bot services
-            const services = ServiceContainerFactory.create(botId);
-
-            // Pass services to bot classes
-            const xtermBot = new XtermBot(
-                botId,
-                services.xtermService,
-                services.xtermRendererService,
-                services.configService
-            );
-            const coderBot = new CoderBot(
-                botId,
-                token,
-                services.xtermService,
-                services.xtermRendererService,
-                services.coderService,
-                services.configService
-            );
-
-            // Store bot instance with its services
-            botInstances.push({
-                bot,
-                services,
-                xtermBot,
-                coderBot
-            });
-
-            // Register handlers - CoderBot first for general commands, then XtermBot for specific ones
-            coderBot.registerHandlers(bot);
-            xtermBot.registerHandlers(bot);
-
-            await bot.api.setMyCommands([
-                { command: 'screen', description: 'Capture and view terminal screenshot' },
-                { command: 'send', description: 'Send text to terminal with Enter' },
-                { command: 'help', description: 'Show complete command reference' },
-                { command: 'tab', description: 'Send Tab character' },
-                { command: 'copilot', description: 'Start a new terminal session with Copilot' },
-                { command: 'claude', description: 'Start a new terminal session with Claude' },
-                { command: 'cursor', description: 'Start a new terminal session with Cursor' },
-                { command: 'enter', description: 'Send Enter key' },
-                { command: 'start', description: 'Show help message with all commands' },
-                { command: 'close', description: 'Close the current terminal session' },
-            ]);
-
-            bot.start();
-            console.log(`✅ Bot ${i + 1} started successfully`);
+    // Handle messages from child
+    childProcess.on('message', (message: any) => {
+        if (message.type === 'READY') {
+            worker.ready = true;
+            console.log(`[Parent] Bot worker ${botIndex} is ready`);
         }
+    });
+
+    // Handle child exit
+    childProcess.on('exit', (code, signal) => {
+        console.log(`[Parent] Bot worker ${botIndex} exited with code ${code}, signal ${signal}`);
+
+        // Auto-restart on unexpected exit (not during shutdown)
+        if (!shuttingDown && code !== 0) {
+            console.log(`[Parent] Restarting bot worker ${botIndex} in 5 seconds...`);
+            setTimeout(() => {
+                const newWorker = spawnBotWorker(token, index);
+                const workerIndex = botWorkers.findIndex(w => w.botIndex === botIndex);
+                if (workerIndex !== -1) {
+                    botWorkers[workerIndex] = newWorker;
+                }
+            }, 5000);
+        }
+    });
+
+    // Handle child errors
+    childProcess.on('error', (error) => {
+        console.error(`[Parent] Bot worker ${botIndex} error:`, error);
+    });
+
+    return worker;
+}
+
+/**
+ * Start all bot workers
+ */
+async function startBotWorkers() {
+    try {
+        // Spawn a worker for each bot token
+        for (let i = 0; i < botTokens.length; i++) {
+            const worker = spawnBotWorker(botTokens[i], i);
+            botWorkers.push(worker);
+
+            // Add small delay between spawns to avoid overwhelming the system
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        console.log(`[Parent] ✅ All ${botWorkers.length} bot worker(s) spawned`);
     } catch (error) {
-        console.error('Failed to start bot:', error);
+        console.error('[Parent] Failed to start bot workers:', error);
         process.exit(1);
     }
 }
+
+let shuttingDown = false;
 
 /**
  * Graceful shutdown handler for cleanup on process termination
  */
 async function gracefulShutdown(signal: string): Promise<void> {
-    console.log(`Received ${signal}, shutting down gracefully...`);
-    mediaWatcherService.cleanup();
+    if (shuttingDown) {
+        console.log('[Parent] Shutdown already in progress...');
+        return;
+    }
 
-    // Cleanup each bot's services independently
-    await Promise.all(
-        botInstances.map(async (instance) => {
-            await instance.services.cleanup();
-            await instance.bot.stop();
-        })
-    );
+    shuttingDown = true;
+    console.log(`[Parent] Received ${signal}, shutting down gracefully...`);
 
+    // Send SIGTERM to all child processes
+    const shutdownPromises = botWorkers.map((worker) => {
+        return new Promise<void>((resolve) => {
+            if (worker.process.killed) {
+                resolve();
+                return;
+            }
+
+            console.log(`[Parent] Sending shutdown signal to bot worker ${worker.botIndex}`);
+
+            // Set timeout for forced kill
+            const timeout = setTimeout(() => {
+                console.log(`[Parent] Force killing bot worker ${worker.botIndex}`);
+                worker.process.kill('SIGKILL');
+                resolve();
+            }, 10000); // 10 second timeout
+
+            worker.process.once('exit', () => {
+                clearTimeout(timeout);
+                resolve();
+            });
+
+            worker.process.kill('SIGTERM');
+        });
+    });
+
+    await Promise.all(shutdownPromises);
+    console.log('[Parent] ✅ All bot workers stopped');
     process.exit(0);
 }
 
@@ -151,14 +167,16 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    console.error('[Parent] Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-    console.error('Uncaught Exception:', error);
+    console.error('[Parent] Uncaught Exception:', error);
+    gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 
-startBot().then(() => {
-    console.log(`✅ All ${bots.length} bot(s) started successfully`);
+// Start all bot workers
+startBotWorkers().then(() => {
+    console.log(`[Parent] ✅ CoderBot parent process ready with ${botWorkers.length} worker(s)`);
 }).catch(console.error);

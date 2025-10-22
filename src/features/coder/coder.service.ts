@@ -10,9 +10,12 @@ export interface TerminalDataHandlers {
 export class CoderService {
     private config: CoderConfig;
     private dataBuffers: Map<string, string> = new Map();
+    private botId: string;
 
-    constructor(configService: ConfigService) {
-        const mediaPath = configService.getMediaTmpLocation();
+    constructor(configService: ConfigService, botId: string) {
+        this.botId = botId;
+        const baseMediaPath = configService.getMediaTmpLocation();
+        const mediaPath = path.join(baseMediaPath, botId);
         this.config = {
             mediaPath,
             receivedPath: path.join(mediaPath, 'received'),

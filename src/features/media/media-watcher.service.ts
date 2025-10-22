@@ -4,8 +4,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 export class MediaWatcherService {
-    private bots: Bot[] = [];
+    private bot: Bot | null = null;
     private configService: ConfigService;
+    private botId: string;
     private watchPath: string;
     private sentPath: string;
     private receivedPath: string;
@@ -13,44 +14,47 @@ export class MediaWatcherService {
     private allowedUserIds: number[] = [];
     private processingFiles: Set<string> = new Set();
 
-    constructor(configService: ConfigService) {
+    constructor(configService: ConfigService, botId: string) {
         this.configService = configService;
-        this.watchPath = configService.getMediaTmpLocation();
+        this.botId = botId;
+        // Create bot-specific media directory
+        const baseMediaPath = configService.getMediaTmpLocation();
+        this.watchPath = path.join(baseMediaPath, botId);
         this.sentPath = path.join(this.watchPath, 'sent');
         this.receivedPath = path.join(this.watchPath, 'received');
     }
 
-    async initialize(bots: Bot[]): Promise<void> {
-        this.bots = bots;
+    async initialize(bot: Bot): Promise<void> {
+        this.bot = bot;
 
         // Load allowed user IDs from config service
         this.allowedUserIds = this.configService.getAllowedUserIds();
 
-        console.log(`Media watcher configured for ${this.allowedUserIds.length} user(s): ${this.allowedUserIds.join(', ')}`);
+        console.log(`[${this.botId}] Media watcher configured for ${this.allowedUserIds.length} user(s): ${this.allowedUserIds.join(', ')}`);
 
         await this.ensureDirectories();
         this.startWatching();
-        console.log(`Media watcher initialized: ${this.watchPath}`);
+        console.log(`[${this.botId}] Media watcher initialized: ${this.watchPath}`);
     }
 
     private async ensureDirectories(): Promise<void> {
         try {
             if (!fs.existsSync(this.watchPath)) {
                 fs.mkdirSync(this.watchPath, { recursive: true });
-                console.log(`Created media directory: ${this.watchPath}`);
+                console.log(`[${this.botId}] Created media directory: ${this.watchPath}`);
             }
 
             if (!fs.existsSync(this.sentPath)) {
                 fs.mkdirSync(this.sentPath, { recursive: true });
-                console.log(`Created sent directory: ${this.sentPath}`);
+                console.log(`[${this.botId}] Created sent directory: ${this.sentPath}`);
             }
 
             if (!fs.existsSync(this.receivedPath)) {
                 fs.mkdirSync(this.receivedPath, { recursive: true });
-                console.log(`Created received directory: ${this.receivedPath}`);
+                console.log(`[${this.botId}] Created received directory: ${this.receivedPath}`);
             }
         } catch (error) {
-            console.error('Failed to create media directories:', error);
+            console.error(`[${this.botId}] Failed to create media directories:`, error);
             throw error;
         }
     }
@@ -81,73 +85,61 @@ export class MediaWatcherService {
     }
 
     private async processFile(filePath: string, filename: string): Promise<void> {
-        if (this.bots.length === 0) {
-            console.error('No bots initialized');
+        if (!this.bot) {
+            console.error(`[${this.botId}] Bot not initialized`);
             this.processingFiles.delete(filePath);
             return;
         }
 
         try {
             if (!fs.existsSync(filePath)) {
-                console.log(`File no longer exists: ${filename}`);
+                console.log(`[${this.botId}] File no longer exists: ${filename}`);
                 this.processingFiles.delete(filePath);
                 return;
             }
 
-            console.log(`Processing media file: ${filename}`);
-            console.log(`Allowed user IDs: ${this.allowedUserIds.join(', ')}`);
+            console.log(`[${this.botId}] Processing media file: ${filename}`);
 
             const ext = path.extname(filename).toLowerCase();
 
-            // Try to send to each user via all bot instances (one will succeed per user)
+            // Send to each allowed user via this bot
             for (const userId of this.allowedUserIds) {
-                let sent = false;
-                for (const bot of this.bots) {
-                    try {
-                        // Create a new InputFile for each attempt to avoid reuse issues
-                        const inputFile = new InputFile(filePath);
+                try {
+                    const inputFile = new InputFile(filePath);
 
-                        if (this.isImageFile(ext)) {
-                            await bot.api.sendPhoto(userId, inputFile, {
-                                caption: filename
-                            });
-                        } else if (this.isAnimationFile(ext)) {
-                            await bot.api.sendAnimation(userId, inputFile, {
-                                caption: filename
-                            });
-                        } else if (this.isVideoFile(ext)) {
-                            await bot.api.sendVideo(userId, inputFile, {
-                                caption: filename
-                            });
-                        } else if (this.isAudioFile(ext)) {
-                            await bot.api.sendAudio(userId, inputFile, {
-                                caption: filename
-                            });
-                        } else if (this.isVoiceFile(ext)) {
-                            await bot.api.sendVoice(userId, inputFile, {
-                                caption: filename
-                            });
-                        } else if (this.isWebPFile(ext)) {
-                            // Send WebP as document to preserve format (could be static or animated)
-                            await bot.api.sendDocument(userId, inputFile, {
-                                caption: filename
-                            });
-                        } else {
-                            // All other file types sent as documents (no size/type restrictions)
-                            await bot.api.sendDocument(userId, inputFile, {
-                                caption: filename
-                            });
-                        }
-
-                        console.log(`✅ Successfully sent ${filename} to user ${userId}`);
-                        sent = true;
-                        break; // Successfully sent, no need to try other bots
-                    } catch (error) {
-                        // Try next bot instance
+                    if (this.isImageFile(ext)) {
+                        await this.bot.api.sendPhoto(userId, inputFile, {
+                            caption: filename
+                        });
+                    } else if (this.isAnimationFile(ext)) {
+                        await this.bot.api.sendAnimation(userId, inputFile, {
+                            caption: filename
+                        });
+                    } else if (this.isVideoFile(ext)) {
+                        await this.bot.api.sendVideo(userId, inputFile, {
+                            caption: filename
+                        });
+                    } else if (this.isAudioFile(ext)) {
+                        await this.bot.api.sendAudio(userId, inputFile, {
+                            caption: filename
+                        });
+                    } else if (this.isVoiceFile(ext)) {
+                        await this.bot.api.sendVoice(userId, inputFile, {
+                            caption: filename
+                        });
+                    } else if (this.isWebPFile(ext)) {
+                        await this.bot.api.sendDocument(userId, inputFile, {
+                            caption: filename
+                        });
+                    } else {
+                        await this.bot.api.sendDocument(userId, inputFile, {
+                            caption: filename
+                        });
                     }
-                }
-                if (!sent) {
-                    console.error(`❌ Failed to send ${filename} to user ${userId} via any bot`);
+
+                    console.log(`[${this.botId}] ✅ Successfully sent ${filename} to user ${userId}`);
+                } catch (error) {
+                    console.error(`[${this.botId}] ❌ Failed to send ${filename} to user ${userId}:`, error);
                 }
             }
 
@@ -199,13 +191,13 @@ export class MediaWatcherService {
                 const nameWithoutExt = path.basename(filename, ext);
                 const newFilename = `${nameWithoutExt}_${timestamp}${ext}`;
                 fs.renameSync(filePath, path.join(this.sentPath, newFilename));
-                console.log(`Moved ${filename} to sent/${newFilename}`);
+                console.log(`[${this.botId}] Moved ${filename} to sent/${newFilename}`);
             } else {
                 fs.renameSync(filePath, sentFilePath);
-                console.log(`Moved ${filename} to sent/`);
+                console.log(`[${this.botId}] Moved ${filename} to sent/`);
             }
         } catch (error) {
-            console.error(`Failed to move ${filename} to sent folder:`, error);
+            console.error(`[${this.botId}] Failed to move ${filename} to sent folder:`, error);
         }
     }
 
@@ -213,12 +205,12 @@ export class MediaWatcherService {
         if (this.watcher) {
             this.watcher.close();
             this.watcher = null;
-            console.log('Media watcher stopped');
+            console.log(`[${this.botId}] Media watcher stopped`);
         }
     }
 }
 
 // Export a function to create the service with config
-export function createMediaWatcherService(configService: ConfigService): MediaWatcherService {
-    return new MediaWatcherService(configService);
+export function createMediaWatcherService(configService: ConfigService, botId: string): MediaWatcherService {
+    return new MediaWatcherService(configService, botId);
 }

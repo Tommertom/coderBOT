@@ -19,6 +19,7 @@ export class ConfigService {
 
     // Media Configuration
     private readonly mediaTmpLocation: string;
+    private readonly cleanUpMediaDir: boolean;
 
     // Message Configuration
     private readonly messageDeleteTimeout: number;
@@ -56,6 +57,8 @@ export class ConfigService {
 
         // Load media configuration
         this.mediaTmpLocation = process.env.MEDIA_TMP_LOCATION || '/tmp/coderBOT_media';
+        const cleanUpValue = process.env.CLEAN_UP_MEDIADIR?.toLowerCase();
+        this.cleanUpMediaDir = cleanUpValue === 'true' || cleanUpValue === '1';
 
         // Load message configuration
         this.messageDeleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
@@ -104,6 +107,10 @@ export class ConfigService {
         return this.mediaTmpLocation;
     }
 
+    shouldCleanUpMediaDir(): boolean {
+        return this.cleanUpMediaDir;
+    }
+
     // Message Configuration Getters
     getMessageDeleteTimeout(): number {
         return this.messageDeleteTimeout;
@@ -140,6 +147,7 @@ export class ConfigService {
   - Xterm Terminal: ${this.xtermTerminalRows}x${this.xtermTerminalCols}
   - Xterm Shell: ${this.xtermShellPath}
   - Media Location: ${this.mediaTmpLocation}
+  - Clean Up Media Dir: ${this.cleanUpMediaDir}
   - Message Delete Timeout: ${this.messageDeleteTimeout}ms`;
     }
 }

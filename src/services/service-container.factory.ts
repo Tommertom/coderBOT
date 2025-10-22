@@ -16,7 +16,7 @@ export class ServiceContainerFactory {
 
         const xtermService = new XtermService(configService);
         const xtermRendererService = new XtermRendererService();
-        const coderService = new CoderService(configService);
+        const coderService = new CoderService(configService, botId);
 
         return {
             configService,

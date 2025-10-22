@@ -35,6 +35,12 @@ XTERM_SHELL_PATH=/bin/bash
 # Files will be sent and then moved to a 'sent' subfolder
 MEDIA_TMP_LOCATION=/tmp/coderBOT_media
 
+# Clean up media directory on worker startup (true/false)
+# If set to true, each bot worker will delete its media directory (including subdirectories)
+# on startup, ensuring a clean state. Useful for development or fresh starts.
+# WARNING: This will delete all files in {MEDIA_TMP_LOCATION}/bot-N/ directories
+CLEAN_UP_MEDIADIR=false
+
 # Message auto-delete timeout in milliseconds (default: 10000 = 10 seconds)
 # Time to wait before automatically deleting confirmation messages
 # Set to 0 to disable auto-deletion of messages
