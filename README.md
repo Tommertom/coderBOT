@@ -1,6 +1,26 @@
-# Coder Bot
+# CoderBot
 
-A Telegram bot that provides interactive terminal sessions with support for AI coding assistants (GitHub Copilot, Claude, Cursor, or any CLI-based AI tool).
+[![npm version](https://badge.fury.io/js/@tommertom%2Fcoderbot.svg)](https://www.npmjs.com/package/@tommertom/coderbot)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+A Telegram bot that provides interactive terminal sessions with support for AI coding assistants (GitHub Copilot, Claude, Cursor, or any CLI-based AI tool). Run it instantly with `npx` or install it globally.
+
+## Quick Start
+
+**Run instantly with npx (recommended):**
+
+```bash
+npx @tommertom/coderbot
+```
+
+On first run, it will create a `.env` file that you need to configure with your bot tokens and user IDs. Edit the file and run the command again.
+
+**Or install globally:**
+
+```bash
+npm install -g @tommertom/coderbot
+coderbot
+```
 
 ## Features
 
@@ -13,9 +33,13 @@ A Telegram bot that provides interactive terminal sessions with support for AI c
 - 🔄 **Session Management**: Multiple concurrent sessions with automatic timeout handling
 - 🎯 **Interactive Menu Support**: Number key support for navigating CLI tool menus
 
-## Environment Variables
+## Configuration
 
-Create a `.env` file in the root directory with the following variables:
+CoderBot uses environment variables for configuration. When you run it for the first time with `npx @tommertom/coderbot`, it will automatically create a `.env` file in your current directory.
+
+### Required Variables
+
+Edit the `.env` file and configure these required variables:
 
 ```env
 # Telegram Bot Configuration (Required)
@@ -54,7 +78,14 @@ XTERM_SHELL_PATH=/bin/bash
 # Media Folder (Optional)
 # Directory to watch for files to send to users
 # Files are automatically sent and moved to 'sent' subfolder
+# In multi-process mode, each bot gets its own subdirectory: {MEDIA_TMP_LOCATION}/bot-N/
 MEDIA_TMP_LOCATION=/tmp/coderBOT_media
+
+# Clean up media directory on worker startup (default: false)
+# When true, each bot worker deletes its media directory on startup for a fresh start
+# Useful for development/testing, but typically disabled in production
+# WARNING: This deletes all files including sent/ folder history
+CLEAN_UP_MEDIADIR=false
 
 # Message Management (Optional)
 # Time in milliseconds before auto-deleting confirmation messages (default: 10000 = 10 seconds)
@@ -70,7 +101,7 @@ MESSAGE_DELETE_TIMEOUT=10000
 
 ### Running Multiple Bot Instances
 
-CoderBOT supports running multiple bot instances simultaneously using a single application instance. Each bot operates independently with its own isolated terminal sessions.
+CoderBOT supports running multiple bot instances simultaneously. Each bot runs in **its own isolated child process** for maximum stability and fault isolation.
 
 **Use Cases:**
 - Run separate bots for different teams or projects
@@ -84,6 +115,13 @@ Simply provide multiple bot tokens separated by commas in `TELEGRAM_BOT_TOKENS`:
 TELEGRAM_BOT_TOKENS=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz,0987654321:XYZabcDEFghiJKLmnoPQRst
 ```
 
+**Process Isolation:**
+- Each bot runs in a separate child process
+- If one bot crashes, others continue running
+- Parent process automatically restarts failed bot workers
+- Each bot has isolated memory and resources
+- Independent media directories per bot
+
 **Session Isolation:**
 - Each bot maintains completely independent terminal sessions
 - The same user can run separate sessions on different bots simultaneously
@@ -94,48 +132,107 @@ TELEGRAM_BOT_TOKENS=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz,0987654321:XYZabcDEFgh
 1. User starts `/copilot` on Bot 1 → Opens Copilot session on Bot 1
 2. User starts `/claude` on Bot 2 → Opens Claude session on Bot 2
 3. Both sessions run independently without interference
+4. If Bot 1 crashes, Bot 2 continues running and Bot 1 auto-restarts
 
 ## Getting Started
 
-### Installation
+### Installation Methods
 
-1. **Clone the repository** (if not already done)
+**Method 1: NPX (Recommended - No installation needed)**
 
-2. **Install dependencies:**
 ```bash
-npm install
+# Run directly without installation
+npx @tommertom/coderbot
+
+# On first run, it creates .env file
+# Edit .env with your configuration
+# Run again to start the bot
+npx @tommertom/coderbot
 ```
 
-3. **Configure environment variables:**
+**Method 2: Global Installation**
+
 ```bash
-cp dot-env.template .env
-# Edit .env with your bot token and user IDs
+# Install globally
+npm install -g @tommertom/coderbot
+
+# Run from anywhere
+coderbot
 ```
 
-4. **Build the project:**
+**Method 3: Docker (Isolated Environment)**
+
 ```bash
-npm run build
+# Create docker-compose.yml and .env files
+# (See DOCKER_GUIDE.md for examples)
+
+# Create and configure .env
+nano .env  # Edit with your configuration
+
+# Start with Docker Compose
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
 ```
+
+See [DOCKER_GUIDE.md](DOCKER_GUIDE.md) for detailed Docker setup instructions including example docker-compose.yml.
+
+### Configuration
+
+After installation, edit the `.env` file in your current directory:
+
+```bash
+# The .env file is created automatically on first run
+# Edit it with your favorite text editor
+nano .env
+# or
+vim .env
+# or
+code .env
+```
+
+**Required configuration:**
+- `TELEGRAM_BOT_TOKENS` - Your bot token(s) from [@BotFather](https://t.me/botfather)
+- `ALLOWED_USER_IDS` - Your Telegram user ID(s)
+
+**Finding your Telegram User ID:**
+1. Start the bot (even without proper configuration)
+2. Send any message to your bot
+3. The bot will display your user ID in the response
+4. Add your ID to `ALLOWED_USER_IDS` in `.env`
+5. Restart the bot
 
 ### Running the Bot
 
-**Development mode** (auto-restart on file changes):
+**With npx:**
 ```bash
-npm run dev
+npx @tommertom/coderbot
 ```
 
-**Production mode:**
+**With global installation:**
 ```bash
-npm start
+coderbot
 ```
 
-**Production with PM2** (process manager):
-```bash
-npm run pm2:start    # Start the bot
-npm run pm2:logs     # View logs
-npm run pm2:restart  # Restart the bot
-npm run pm2:stop     # Stop the bot
-npm run pm2:status   # Check status
+**Production with PM2** (if installed globally):\n```bash\n# Using PM2 to manage the coderbot process\npm2 start coderbot --name coderbot\npm2 logs coderbot       # View logs\npm2 restart coderbot    # Restart\npm2 stop coderbot       # Stop\npm2 status              # Check status\n```
+
+**Monitoring Logs:**
+
+All logs include prefixes for easy identification:
+- `[Parent]` - Parent process managing workers
+- `[Worker bot-0]` - First bot worker
+- `[Worker bot-1]` - Second bot worker
+- `[bot-0]` - Bot-specific service logs (media watcher, etc.)
+
+Example log output:
+```
+[Parent] Starting CoderBot parent process...
+[Parent] Spawning bot worker 0...
+[Worker bot-0] Starting initialization...
+[Worker bot-0] Configuration loaded successfully
+[bot-0] Media watcher initialized: /tmp/coderBOT_media/bot-0
+[Worker bot-0] ✅ Bot started successfully
 ```
 
 ### Prerequisites: Authenticating AI Coding Tools
@@ -428,7 +525,7 @@ This immediately terminates the bot process. Useful if:
    - Monitor network traffic for unusual activity
 
 6. **Audit and Monitoring**
-   - Review terminal activity regularly (PM2 logs: `npm run pm2:logs`)
+   - Review terminal activity regularly (check logs with `pm2 logs coderbot` if using PM2)
    - Monitor for unauthorized access attempts (admin receives notifications)
    - Keep track of which users have access
 
@@ -469,7 +566,7 @@ For maximum security, consider this architecture:
 If you suspect unauthorized access:
 
 1. **Immediate**: Use `/killbot` to shut down the bot
-2. **Investigate**: Check PM2 logs: `npm run pm2:logs`
+2. **Investigate**: Check logs (PM2: `pm2 logs coderbot`, Docker: `docker-compose logs -f`, or console output)
 3. **Rotate**: Change your `TELEGRAM_BOT_TOKEN` via @BotFather
 4. **Review**: Audit `ALLOWED_USER_IDS` list
 5. **Enable**: Set `AUTO_KILL=true` if not already enabled
@@ -477,16 +574,68 @@ If you suspect unauthorized access:
 
 ## Architecture
 
-The bot is built with a modular, service-oriented architecture:
+CoderBot uses a **multi-process architecture** where each bot instance runs in its own isolated child process. This provides better stability, fault isolation, and resource management.
+
+### Multi-Process Design
+
+**Parent Process (`app.ts`):**
+- Loads configuration from `.env`
+- Spawns one child process per bot token
+- Monitors child process health
+- Automatically restarts failed workers
+- Coordinates graceful shutdown
+
+**Child Processes (`bot-worker.ts`):**
+- Initialize single bot instance
+- Create dedicated service container (XtermService, CoderService, etc.)
+- Run dedicated MediaWatcherService for bot-specific directory
+- Handle all bot interactions independently
+- Respond to shutdown signals from parent
+
+**Benefits:**
+- ✅ **Fault Isolation**: One bot crash doesn't affect others
+- ✅ **Auto-Restart**: Failed workers automatically restart after 5 seconds
+- ✅ **Resource Isolation**: Memory leaks and CPU usage isolated per bot
+- ✅ **Simplified Media**: Each bot watches its own directory (no IPC needed)
+- ✅ **Easy Debugging**: Clear log prefixes, scoped issues
+
+### Per-Bot Media Directories
+
+Each bot worker has its own isolated media directory:
+
+```
+{MEDIA_TMP_LOCATION}/
+├── bot-0/              # First bot's media directory
+│   ├── sent/           # Sent media files
+│   └── received/       # Received media files
+├── bot-1/              # Second bot's media directory
+│   ├── sent/
+│   └── received/
+└── bot-N/              # Nth bot's media directory
+    ├── sent/
+    └── received/
+```
+
+**Clean Start Option:**
+
+Set `CLEAN_UP_MEDIADIR=true` in `.env` to delete each bot's media directory on startup:
+
+```env
+CLEAN_UP_MEDIADIR=true   # Delete media directory on startup (useful for development)
+CLEAN_UP_MEDIADIR=false  # Preserve existing media directory (default, recommended for production)
+```
+
+This ensures a fresh start by removing all files including the `sent/` folder archive. Useful for development/testing but typically disabled in production.
 
 ### Core Components
 
-- **app.ts**: Main entry point, bot initialization, and service coordination
+- **app.ts**: Parent process manager, spawns and monitors bot workers
+- **bot-worker.ts**: Child process that runs a single bot instance
 - **CoderBot**: Handles AI assistant sessions (Copilot, Claude, Cursor) and user commands
 - **XtermBot**: Manages raw terminal sessions and special key commands
 - **XtermService**: PTY session management using node-pty
 - **XtermRendererService**: Renders terminal output to images using Puppeteer
-- **MediaWatcherService**: Monitors directory and automatically sends files to users
+- **MediaWatcherService**: Monitors bot-specific directory and automatically sends files to users
 - **AccessControlMiddleware**: User authentication and authorization
 
 ### Technology Stack
@@ -608,21 +757,7 @@ You: /enter
 # Bot automatically sends it
 ```
 
-### Testing
 
-Verify the media watcher setup:
-
-```bash
-npm run test:media
-```
-
-This checks if directories exist and shows their current status.
-
-```bash
-npm run demo:media
-```
-
-This creates a test file to verify end-to-end functionality.
 
 ## Troubleshooting
 
@@ -631,11 +766,11 @@ This creates a test file to verify end-to-end functionality.
 **Issue**: Bot doesn't respond to commands
 
 **Solutions**:
-1. Verify bot is running: `npm run pm2:status` or check process list
+1. Verify bot is running: `pm2 status` or check process list
 2. Check your User ID is in `ALLOWED_USER_IDS`
 3. Verify `TELEGRAM_BOT_TOKEN` is correct
-4. Check logs: `npm run pm2:logs` or console output
-5. Restart the bot: `npm run pm2:restart` or restart process
+4. Check logs: `pm2 logs coderbot` or console output
+5. Restart the bot: `pm2 restart coderbot` or restart process
 
 ### Session Issues
 
@@ -665,7 +800,7 @@ This creates a test file to verify end-to-end functionality.
 **Solutions**:
 1. Verify `MEDIA_TMP_LOCATION` directory exists and is writable
 2. Check file permissions (bot needs read access)
-3. Run test: `npm run test:media`
+3. Test file watching manually by placing a file in the media directory
 4. Check logs for media watcher errors
 5. Verify file is completely written (not being copied)
 
@@ -693,15 +828,14 @@ This creates a test file to verify end-to-end functionality.
 
 ### Build or Start Errors
 
-**Issue**: Bot fails to build or start
+**Issue**: Bot fails to start
 
 **Solutions**:
-1. Run `npm install` to ensure all dependencies are installed
-2. Check Node.js version is compatible (v16+ recommended)
-3. Verify TypeScript is installed: `npm list typescript`
-4. Check for syntax errors in `.env` file
-5. Review build output for specific error messages
-6. Try `rm -rf node_modules dist && npm install && npm run build`
+1. Ensure you're using the latest version: `npx @tommertom/coderbot@latest`
+2. Check Node.js version is compatible (v18+ required)
+3. Verify `.env` file has correct syntax
+4. Check for specific error messages in the output
+5. Try clearing npm cache: `npm cache clean --force`
 
 ### High Memory Usage
 
@@ -713,7 +847,7 @@ This creates a test file to verify end-to-end functionality.
 3. Close unused sessions: `/close`
 4. Reduce session timeout to close inactive sessions sooner
 5. Restart bot periodically to clear memory
-6. Monitor with: `npm run pm2:monit`
+6. Monitor with: `pm2 monit`
 
 ### AI Assistant Not Starting
 
@@ -753,7 +887,7 @@ Bot: 📁 [Automatically sends architecture.png]
 
 ```
 You: /xterm
-You: npm run dev
+You: node index.js
 # Process starts...
 You: /ctrlc  # Stop the process
 You: /screen  # View output
@@ -769,23 +903,24 @@ You: for f in *.jpg; do convert $f -resize 50% [media]/$f; done
 
 ## Contributing
 
-Contributions are welcome! Please ensure:
+This project is maintained as a published npm package. To contribute:
 
-1. Code follows the existing TypeScript style
-2. All new features are documented
-3. Security considerations are addressed
-4. Changes are tested with `npm run build`
-
-## License
-
-ISC
+1. **Report Issues**: [GitHub Issues](https://github.com/Tommertom/coderBOT/issues)
+2. **Feature Requests**: Open an issue with your suggestion
+3. **Bug Reports**: Include steps to reproduce and your environment details
 
 ## Support
 
 For issues and questions:
-- Check the Troubleshooting section above
-- Review logs: `npm run pm2:logs`
-- Check documentation in `/docs` folder
+- **GitHub Issues**: [Report bugs or request features](https://github.com/Tommertom/coderBOT/issues)
+- **Troubleshooting**: See the Troubleshooting section above
+- **NPM Package**: [@tommertom/coderbot](https://www.npmjs.com/package/@tommertom/coderbot)
+
+## Links
+
+- **NPM Package**: [@tommertom/coderbot](https://www.npmjs.com/package/@tommertom/coderbot)
+- **GitHub Repository**: [Tommertom/coderBOT](https://github.com/Tommertom/coderBOT)
+- **Documentation**: [Multi-Process Architecture](docs/multi-process-architecture.md)
 
 ---
 

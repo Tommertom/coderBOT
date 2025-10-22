@@ -1,14 +1,24 @@
 {
-  "name": "coderBOT",
-  "version": "1.0.0",
-  "description": "AI-powered Telegram conversation bot using Google Gemini",
+  "name": "@tommertom/coderbot",
+  "version": "0.2.0",
+  "description": "AI-powered Telegram bot providing interactive terminal sessions with support for GitHub Copilot, Claude, Cursor, and other CLI-based AI coding assistants",
   "main": "dist/app.js",
+  "bin": {
+    "coderbot": "dist/cli.js"
+  },
+  "files": [
+    "dist/**/*",
+    "dot-env.template",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc --outDir dist",
     "dev": "nodemon --watch src --ext ts --exec \"tsc --outDir dist && node dist/app.js\"",
-    "start": "node ./dist/app.js",
+    "start": "node ./dist/cli.js",
     "watch": "tsc --watch",
     "test": "echo \"Error: no test specified\" && exit 1",
+    "publish": "npm run build && npm version minor && npm publish --access public",
     "pm2:start": "npm run build && pm2 start ecosystem.config.cjs",
     "pm2:stop": "pm2 stop coderBOT",
     "pm2:restart": "npm run build && pm2 restart coderBOT",
@@ -17,10 +27,34 @@
     "pm2:monit": "pm2 monit",
     "pm2:status": "pm2 status"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "telegram",
+    "bot",
+    "ai",
+    "copilot",
+    "claude",
+    "cursor",
+    "terminal",
+    "xterm",
+    "pty",
+    "coding-assistant",
+    "cli",
+    "automation"
+  ],
+  "author": "Tommertom",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tommertom/coderBOT.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Tommertom/coderBOT/issues"
+  },
+  "homepage": "https://github.com/Tommertom/coderBOT#readme",
+  "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "devDependencies": {
     "@types/archiver": "^6.0.3",
     "@types/node": "^24.3.0",

@@ -1,0 +1,50 @@
+# Source files
+src/
+*.ts
+!*.d.ts
+tsconfig.json
+
+# Development files
+.env
+.env.*
+!dot-env.template
+node_modules/
+logs/
+*.log
+
+# Git files
+.git/
+.gitignore
+
+# Documentation (keep essential docs, exclude Docker-specific)
+docs/
+DOCKER_GUIDE.md
+
+# Development configs
+nodemon.json
+ecosystem.config.cjs
+
+# Docker files (not needed in npm package)
+Dockerfile
+docker-compose.yml
+
+# IDE
+.vscode/
+.idea/
+
+# Test files
+test/
+*.test.js
+*.spec.js
+
+# Media directories
+media/
+media-tmp/
+/tmp/
+
+# Build artifacts
+*.tsbuildinfo
+
+# Misc
+.DS_Store
+core

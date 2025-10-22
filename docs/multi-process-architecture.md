@@ -185,10 +185,10 @@ All logs are prefixed for easy identification:
 The architecture works seamlessly with PM2:
 
 ```bash
-npm run pm2:start    # Start parent process
-npm run pm2:logs     # View all logs (parent + workers)
-npm run pm2:restart  # Restart parent (will restart all workers)
-npm run pm2:stop     # Stop parent (will stop all workers)
+pm2 start coderbot   # Start parent process
+pm2 logs coderbot    # View all logs (parent + workers)
+pm2 restart coderbot # Restart parent (will restart all workers)
+pm2 stop coderbot    # Stop parent (will stop all workers)
 ```
 
 ## Migration Notes

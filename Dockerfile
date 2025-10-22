@@ -111,30 +111,42 @@ RUN useradd -m -s /bin/bash botuser && \
 # Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-
-# Install Node.js dependencies
-RUN npm ci --omit=dev
-
-# Copy application code
-COPY . .
-
-# Build TypeScript
-RUN npm run build
-
 # Create necessary directories
-RUN mkdir -p /app/logs /media/bot_generated && \
-    chown -R node:node /app /media/bot_generated
+RUN mkdir -p /app/logs /app/.env-default && \
+    chown -R node:node /app
 
 # Switch to node user for running the bot
 USER node
 
-# Set environment variables (override with docker-compose or -e flags)
+# Set environment variables
 ENV NODE_ENV=production
 ENV XTERM_SHELL_PATH=/bin/bash
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
-# Start the bot
-CMD ["node", "dist/src/app.js"]
+# Install coderbot globally via npm
+# This way we always get the latest published version
+RUN npm install -g @tommertom/coderbot
+
+# The .env file should be mounted via volume or passed as environment variables
+# Create a startup script that handles .env creation if needed
+RUN echo '#!/bin/bash\n\
+# Check if .env exists in mounted volume or current directory\n\
+if [ ! -f /app/.env ]; then\n\
+    echo "⚠️  No .env file found at /app/.env"\n\
+    echo "Please mount your .env file as a volume:"\n\
+    echo "  docker run -v $(pwd)/.env:/app/.env ..."\n\
+    echo ""\n\
+    echo "Or set environment variables directly:"\n\
+    echo "  -e TELEGRAM_BOT_TOKENS=your_token"\n\
+    echo "  -e ALLOWED_USER_IDS=your_user_id"\n\
+    exit 1\n\
+fi\n\
+\n\
+# Run coderbot from the app directory where .env is mounted\n\
+cd /app\n\
+exec coderbot\n\
+' > /home/node/start-coderbot.sh && chmod +x /home/node/start-coderbot.sh
+
+# Start the bot using the startup script
+CMD ["/home/node/start-coderbot.sh"]
