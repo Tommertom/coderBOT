@@ -10,7 +10,7 @@ A Telegram bot that provides interactive terminal sessions with support for AI c
 **Run instantly with npx (recommended):**
 
 ```bash
-npx @tommertom/coderbot
+npx @tommertom/coderbot@latest
 ```
 
 On first run, it will create a `.env` file that you need to configure with your bot tokens and user IDs. Edit the file and run the command again.
@@ -35,7 +35,7 @@ coderbot
 
 ## Configuration
 
-CoderBot uses environment variables for configuration. When you run it for the first time with `npx @tommertom/coderbot`, it will automatically create a `.env` file in your current directory.
+CoderBot uses environment variables for configuration. When you run it for the first time with `npx @tommertom/coderbot@latest`, it will automatically create a `.env` file in your current directory.
 
 ### Required Variables
 
@@ -142,12 +142,12 @@ TELEGRAM_BOT_TOKENS=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz,0987654321:XYZabcDEFgh
 
 ```bash
 # Run directly without installation
-npx @tommertom/coderbot
+npx @tommertom/coderbot@latest
 
 # On first run, it creates .env file
 # Edit .env with your configuration
 # Run again to start the bot
-npx @tommertom/coderbot
+npx @tommertom/coderbot@latest
 ```
 
 **Method 2: Global Installation**
@@ -207,7 +207,7 @@ code .env
 
 **With npx:**
 ```bash
-npx @tommertom/coderbot
+npx @tommertom/coderbot@latest
 ```
 
 **With global installation:**
@@ -831,7 +831,7 @@ You: /enter
 **Issue**: Bot fails to start
 
 **Solutions**:
-1. Ensure you're using the latest version: `npx @tommertom/coderbot@latest`
+1. Ensure you're using the latest version: `npx @tommertom/coderbot@latest@latest`
 2. Check Node.js version is compatible (v18+ required)
 3. Verify `.env` file has correct syntax
 4. Check for specific error messages in the output
