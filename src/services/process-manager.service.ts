@@ -1,6 +1,7 @@
 import { ChildProcess, fork } from 'child_process';
 import * as path from 'path';
 import { IPCMessage, IPCMessageType, HealthCheckResponse } from '../types/ipc.types.js';
+import { ConfigService } from './config.service.js';
 
 export interface BotProcessInfo {
     botId: string;
@@ -17,6 +18,11 @@ export class ProcessManager {
     private processes: Map<string, ChildProcess> = new Map();
     private processInfo: Map<string, BotProcessInfo> = new Map();
     private readonly MAX_LOG_LINES = 100;
+    private configService: ConfigService;
+
+    constructor(configService: ConfigService) {
+        this.configService = configService;
+    }
 
     async startBot(botId: string, token: string): Promise<void> {
         if (this.processes.has(botId)) {
@@ -25,7 +31,7 @@ export class ProcessManager {
 
         const info: BotProcessInfo = {
             botId,
-            token: this.maskToken(token),
+            token: token,
             pid: null,
             status: 'starting',
             startTime: null,
@@ -38,12 +44,14 @@ export class ProcessManager {
 
         try {
             const workerPath = path.join(process.cwd(), 'dist', 'bot-worker.js');
-            
+
+            const botIndex = botId.replace('bot-', '');
             const childProcess = fork(workerPath, [], {
                 env: {
-                    ...process.env,
+                    ...this.configService.getSystemEnv(),
+                    BOT_TOKEN: token,
+                    BOT_INDEX: botIndex,
                     BOT_ID: botId,
-                    TELEGRAM_BOT_TOKENS: token,
                 },
                 stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
             });
@@ -127,7 +135,7 @@ export class ProcessManager {
         }
 
         const token = info.token;
-        
+
         if (this.processes.has(botId)) {
             await this.stopBot(botId);
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -138,7 +146,7 @@ export class ProcessManager {
 
     async stopAllBots(): Promise<void> {
         const stopPromises = Array.from(this.processes.keys()).map(botId =>
-            this.stopBot(botId).catch(err => 
+            this.stopBot(botId).catch(err =>
                 console.error(`Failed to stop ${botId}:`, err)
             )
         );
@@ -172,7 +180,10 @@ export class ProcessManager {
             info.uptime = Date.now() - info.startTime.getTime();
         }
 
-        return { ...info };
+        return {
+            ...info,
+            token: this.maskToken(info.token)
+        };
     }
 
     getAllBotStatuses(): BotProcessInfo[] {
@@ -180,7 +191,10 @@ export class ProcessManager {
             if (info.startTime && info.status === 'running') {
                 info.uptime = Date.now() - info.startTime.getTime();
             }
-            return { ...info };
+            return {
+                ...info,
+                token: this.maskToken(info.token)
+            };
         });
     }
 
@@ -248,10 +262,10 @@ export class ProcessManager {
         info.status = 'stopped';
         info.pid = null;
 
-        const exitMsg = signal 
+        const exitMsg = signal
             ? `Bot ${botId} exited with signal ${signal}`
             : `Bot ${botId} exited with code ${code}`;
-        
+
         console.log(exitMsg);
         this.addLog(botId, exitMsg);
 

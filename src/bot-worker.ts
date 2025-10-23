@@ -14,7 +14,10 @@ console.log('[Worker] Starting bot worker process...');
 
 dotenv.config();
 
-// Get bot configuration from environment variables
+// Initialize config service first
+const configService = new ConfigService();
+
+// Get bot configuration from environment variables (set by ProcessManager)
 const botToken = process.env.BOT_TOKEN;
 const botIndex = process.env.BOT_INDEX;
 
@@ -30,9 +33,6 @@ if (!botIndex) {
 
 const botId = `bot-${botIndex}`;
 console.log(`[Worker ${botId}] Initializing with token: ${botToken.substring(0, 10)}...`);
-
-// Initialize config service
-const configService = new ConfigService();
 
 try {
     configService.validate();
@@ -204,7 +204,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
 
     try {
         sendStatusUpdate('stopping');
-        
+
         // Cleanup media watcher
         mediaWatcherService.cleanup();
 

@@ -16,7 +16,7 @@ dotenv.config();
 
 // Initialize global config service
 const globalConfig = new ConfigService();
-const processManager = new ProcessManager();
+const processManager = new ProcessManager(globalConfig);
 const configManager = new ConfigManager('.env');
 let controlBot: ControlBot | null = null;
 
@@ -129,27 +129,27 @@ async function startBotWorkers() {
 async function checkBotTokenChanges(): Promise<void> {
     try {
         console.log('[Parent] Checking for bot token changes...');
-        
+
         // Reload environment variables
         dotenv.config();
-        
+
         // Create new config to get updated tokens
         const newConfig = new ConfigService();
         const newBotTokens = newConfig.getTelegramBotTokens();
-        
+
         // Find tokens that were removed
         const removedTokens = currentBotTokens.filter(token => !newBotTokens.includes(token));
-        
+
         // Find tokens that were added
         const addedTokens = newBotTokens.filter(token => !currentBotTokens.includes(token));
-        
+
         if (removedTokens.length === 0 && addedTokens.length === 0) {
             console.log('[Parent] No bot token changes detected');
             return;
         }
-        
+
         console.log(`[Parent] Token changes detected: ${addedTokens.length} added, ${removedTokens.length} removed`);
-        
+
         // Kill workers for removed tokens
         for (const removedToken of removedTokens) {
             const workerIndex = botWorkers.findIndex(w => w.token === removedToken);
@@ -160,7 +160,7 @@ async function checkBotTokenChanges(): Promise<void> {
                 botWorkers.splice(workerIndex, 1);
             }
         }
-        
+
         // Spawn workers for added tokens
         for (const addedToken of addedTokens) {
             // Check if this token is already running (shouldn't happen but safety check)
@@ -168,20 +168,20 @@ async function checkBotTokenChanges(): Promise<void> {
                 console.log(`[Parent] Token already has a running worker, skipping`);
                 continue;
             }
-            
+
             // Find next available index
             const nextIndex = botWorkers.length;
             console.log(`[Parent] Spawning new bot worker for added token (index ${nextIndex})`);
             const worker = spawnBotWorker(addedToken, nextIndex);
             botWorkers.push(worker);
-            
+
             // Add small delay between spawns
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
-        
+
         // Update current tokens
         currentBotTokens = newBotTokens;
-        
+
         console.log(`[Parent] ✅ Bot workers updated: ${botWorkers.length} total worker(s)`);
     } catch (error) {
         console.error('[Parent] Error checking bot token changes:', error);
@@ -193,14 +193,14 @@ async function checkBotTokenChanges(): Promise<void> {
  */
 function startBotTokenMonitoring(): void {
     const monitorIntervalMs = globalConfig.getBotTokenMonitorInterval();
-    
+
     if (monitorIntervalMs <= 0) {
         console.log('[Parent] Bot token monitoring is disabled');
         return;
     }
-    
+
     console.log(`[Parent] Starting bot token monitoring (interval: ${monitorIntervalMs}ms)`);
-    
+
     monitorInterval = setInterval(() => {
         checkBotTokenChanges();
     }, monitorIntervalMs);
@@ -241,7 +241,7 @@ async function initializeControlBot(): Promise<void> {
 
     try {
         await configManager.initialize();
-        
+
         controlBot = new ControlBot(
             token,
             processManager,
@@ -263,15 +263,15 @@ async function startBotWorkersWithProcessManager() {
     try {
         const tokens = globalConfig.getTelegramBotTokens();
         console.log(`[Parent] Starting ${tokens.length} bot worker(s) via ProcessManager...`);
-        
+
         for (let i = 0; i < tokens.length; i++) {
             const botId = `bot-${i + 1}`;
             await processManager.startBot(botId, tokens[i]);
-            
+
             // Small delay between spawns
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
-        
+
         console.log(`[Parent] ✅ All ${tokens.length} bot worker(s) started`);
     } catch (error) {
         console.error('[Parent] Failed to start bot workers:', error);
@@ -354,13 +354,13 @@ process.on('uncaughtException', (error) => {
 // Start all bot workers
 startBotWorkers().then(async () => {
     console.log(`[Parent] ✅ CoderBot parent process ready with ${botWorkers.length} worker(s)`);
-    
+
     // Start new ProcessManager-based workers
     await startBotWorkersWithProcessManager();
-    
+
     // Initialize Control Bot
     await initializeControlBot();
-    
+
     // Start monitoring for token changes
     startBotTokenMonitoring();
 }).catch(console.error);

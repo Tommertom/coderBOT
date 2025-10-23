@@ -30,11 +30,6 @@ coderbot
 ### Windows
 ❌ **Not Supported** - CoderBOT uses `node-pty` which requires native compilation.
 
-**Windows Users: Please use Docker**
-- See [DOCKER_README.md](DOCKER_README.md) for setup instructions
-- Docker provides full compatibility without build tool requirements
-
-
 ## Features
 
 - 🖥️ **Interactive Terminal**: Full xterm terminal access via Telegram with PTY support
@@ -192,22 +187,7 @@ coderbot
 ```
 
 **Method 3: Docker (Isolated Environment)**
-
-```bash
-# Create docker-compose.yml and .env files
-# (See DOCKER_README.md for examples)
-
-# Create and configure .env
-nano .env  # Edit with your configuration
-
-# Start with Docker Compose
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-```
-
-See [DOCKER_README.md](DOCKER_README.md) for detailed Docker setup instructions including example docker-compose.yml.
+(to document later)
 
 ### Configuration
 
@@ -227,88 +207,11 @@ code .env
 - `TELEGRAM_BOT_TOKENS` - Your bot token(s) from [@BotFather](https://t.me/botfather)
 - `ALLOWED_USER_IDS` - Your Telegram user ID(s)
 
-**Finding your Telegram User ID:**
-1. Start the bot (even without proper configuration)
-2. Send any message to your bot
-3. The bot will display your user ID in the response
-4. Add your ID to `ALLOWED_USER_IDS` in `.env`
-5. Restart the bot
-
-### Running the Bot
-
-**With npx:**
-```bash
-npx @tommertom/coderbot@latest
-```
-
-**With global installation:**
-```bash
-coderbot
-```
-
-**Production with PM2** (if installed globally):\n```bash\n# Using PM2 to manage the coderbot process\npm2 start coderbot --name coderbot\npm2 logs coderbot       # View logs\npm2 restart coderbot    # Restart\npm2 stop coderbot       # Stop\npm2 status              # Check status\n```
-
-**Monitoring Logs:**
-
-All logs include prefixes for easy identification:
-- `[Parent]` - Parent process managing workers
-- `[Worker bot-0]` - First bot worker
-- `[Worker bot-1]` - Second bot worker
-- `[bot-0]` - Bot-specific service logs (media watcher, etc.)
-
-Example log output:
-```
-[Parent] Starting CoderBot parent process...
-[Parent] Spawning bot worker 0...
-[Worker bot-0] Starting initialization...
-[Worker bot-0] Configuration loaded successfully
-[bot-0] Media watcher initialized: /tmp/coderBOT_media/bot-0
-[Worker bot-0] ✅ Bot started successfully
-```
-
 ### Prerequisites: Authenticating AI Coding Tools
 
 **Important:** Before you can use the AI coding assistants (`/copilot`, `/claude`, `/cursor`), you must first authenticate these tools on the server where the bot is running.
-
-**Required Authentication Steps:**
-
-1. **Run each AI tool manually in a terminal** on the server to complete their authentication flow:
-   ```bash
-   # GitHub Copilot CLI
-   github-copilot-cli auth
-   
-   # Claude CLI (Anthropic)
-   claude auth
-   
-   # Cursor CLI
-   cursor auth
-   ```
-
-2. **Authenticate Git and GitHub CLI** (required by most AI tools):
-   ```bash
-   # GitHub CLI authentication
-   gh auth login
-   
-   # Git configuration
-   git config --global user.name "Your Name"
-   git config --global user.email "your.email@example.com"
-   ```
-
-3. **Verify authentication** by running each tool:
-   ```bash
-   github-copilot-cli --version
-   claude --version
-   cursor --version
-   gh auth status
-   ```
-
-**Why This Is Needed:**
-- AI coding tools require API keys or OAuth authentication
-- Authentication tokens are stored in your system's configuration
-- The bot runs these tools as the system user, so they must be pre-authenticated
-- Each tool has its own authentication mechanism (GitHub account, API keys, etc.)
-
-**Note:** Authentication only needs to be done once per server. The credentials persist across bot restarts.
+Do this by manually running each tool in a terminal to complete their authentication flow.
+Include authentication for Git and GitHub CLI as well, since most AI tools depend on them.
 
 ## Commands
 
@@ -429,113 +332,6 @@ ControlBOT is an optional administrative bot that runs in the parent process and
 
 **Administrative:**
 - `/shutdown` - Shutdown entire system
-
-### Learn More
-
-See [ControlBOT Documentation](./docs/control-bot/README.md) for detailed usage guide and examples.
-
-## How to Use
-
-### Starting a Session with an AI Assistant
-
-Use one of the AI assistant commands to start a session:
-
-```
-You: /copilot
-Bot: 🖥️ Terminal Session Started
-     
-     Bash session is now active.
-     [List of available commands]
-     
-     [Screenshot of terminal]
-```
-
-The bot automatically starts the specified AI CLI tool (`copilot`, `claude`, or `cursor`) and displays the terminal.
-
-**Optional Directory Argument:**
-
-You can specify a directory to change into before starting the AI assistant:
-
-```
-You: /copilot /home/user/myproject
-Bot: 🖥️ Terminal Session Started
-     [Terminal starts in /home/user/myproject with Copilot ready]
-```
-
-This is useful when you want to work on a specific project without having to manually navigate to it.
-
-### Interacting with the AI Assistant
-
-Simply send your questions or commands as regular text messages:
-
-```
-You: create a React component for a todo list
-Bot: ✅ Sent - Use /screen to view the output or refresh any existing screen.
-
-You: /screen
-Bot: 🖥️ Terminal Screenshot
-     [Screenshot showing the AI's response]
-```
-
-### Navigating AI Menus
-
-When the AI presents numbered options, use the number commands:
-
-```
-AI shows:
-  1. Accept changes
-  2. Reject changes
-  3. Edit manually
-
-You: /1
-Bot: ✅ Sent: 1
-```
-
-### Working with Generated Files
-
-When the AI generates files you want to receive:
-
-```
-You: create a diagram and copy it to [media]
-Bot: [AI generates diagram.png]
-     ✅ Sent - Use /screen to view the output
-
-# The [media] placeholder is replaced with the actual media directory path
-# Any file copied there is automatically sent to you
-Bot: 📁 [Sends diagram.png to you]
-```
-
-### Using Raw Terminal Mode
-
-For direct bash access without an AI assistant:
-
-```
-You: /xterm
-Bot: 🖥️ Terminal Session Started
-     [Terminal with bash prompt]
-
-You: ls -la
-Bot: ✅ Sent - Use /screen to view the output
-
-You: /screen
-Bot: [Screenshot showing directory listing]
-```
-
-### Sending Special Keys
-
-Control your terminal with special key commands:
-
-```
-# Stop a running process
-You: /ctrlc
-
-# Clear the terminal screen
-You: /ctrl l
-
-# Navigate command history
-You: /ctrl r
-You: git push
-```
 
 ## Security Measures
 
@@ -660,31 +456,20 @@ For maximum security, consider this architecture:
     🌐 Internet
 ```
 
-### Incident Response
-
-If you suspect unauthorized access:
-
-1. **Immediate**: Use `/killbot` to shut down the bot
-2. **Investigate**: Check logs (PM2: `pm2 logs coderbot`, Docker: `docker-compose logs -f`, or console output)
-3. **Rotate**: Change your `TELEGRAM_BOT_TOKEN` via @BotFather
-4. **Review**: Audit `ALLOWED_USER_IDS` list
-5. **Enable**: Set `AUTO_KILL=true` if not already enabled
-6. **Restart**: Restart the bot with updated configuration
-
 ## Architecture
 
 CoderBot uses a **multi-process architecture** where each bot instance runs in its own isolated child process. This provides better stability, fault isolation, and resource management.
 
 ### Multi-Process Design
 
-**Parent Process (`app.ts`):**
+**Parent Process:**
 - Loads configuration from `.env`
 - Spawns one child process per bot token
 - Monitors child process health
 - Automatically restarts failed workers
 - Coordinates graceful shutdown
 
-**Child Processes (`bot-worker.ts`):**
+**Child Processes:**
 - Initialize single bot instance
 - Create dedicated service container (XtermService, CoderService, etc.)
 - Run dedicated MediaWatcherService for bot-specific directory
@@ -726,17 +511,6 @@ CLEAN_UP_MEDIADIR=false  # Preserve existing media directory (default, recommend
 
 This ensures a fresh start by removing all files including the `sent/` folder archive. Useful for development/testing but typically disabled in production.
 
-### Core Components
-
-- **app.ts**: Parent process manager, spawns and monitors bot workers
-- **bot-worker.ts**: Child process that runs a single bot instance
-- **CoderBot**: Handles AI assistant sessions (Copilot, Claude, Cursor) and user commands
-- **XtermBot**: Manages raw terminal sessions and special key commands
-- **XtermService**: PTY session management using node-pty
-- **XtermRendererService**: Renders terminal output to images using Puppeteer
-- **MediaWatcherService**: Monitors bot-specific directory and automatically sends files to users
-- **AccessControlMiddleware**: User authentication and authorization
-
 ### Technology Stack
 
 - **Runtime**: Node.js with TypeScript
@@ -751,63 +525,6 @@ This ensures a fresh start by removing all files including the `sent/` folder ar
 - **No database required**: All configuration via environment variables
 - **Session state**: In-memory (non-persistent across restarts)
 - **File storage**: Media files temporarily stored on filesystem
-
-### Service Architecture
-
-```
-┌─────────────────────────────────────────────────────┐
-│                   Telegram API                       │
-└───────────────────┬─────────────────────────────────┘
-                    │
-┌───────────────────▼─────────────────────────────────┐
-│                  Grammy Bot                          │
-│           (Telegram Bot Framework)                   │
-└─────┬─────────────────────────────────────────┬─────┘
-      │                                         │
-┌─────▼─────────────┐               ┌──────────▼──────┐
-│ AccessControl     │               │ Message Router  │
-│ Middleware        │               │                 │
-└─────┬─────────────┘               └─────────┬───────┘
-      │                                       │
-      │         ┌─────────────────────────────┼─────────┐
-      │         │                             │         │
-┌─────▼─────────▼───┐         ┌──────────────▼───┐  ┌─▼──────────┐
-│   CoderBot         │         │   XtermBot       │  │ Media      │
-│ (AI Assistants)    │         │ (Raw Terminal)   │  │ Watcher    │
-└─────┬──────────────┘         └────────┬─────────┘  └─┬──────────┘
-      │                                 │               │
-      └────────────┬────────────────────┘               │
-                   │                                    │
-         ┌─────────▼─────────┐              ┌──────────▼─────────┐
-         │  XtermService     │              │  File System       │
-         │  (PTY Sessions)   │              │  Monitoring        │
-         └─────────┬─────────┘              └────────────────────┘
-                   │
-         ┌─────────▼──────────┐
-         │ XtermRenderer      │
-         │ Service (Puppeteer)│
-         └────────────────────┘
-```
-
-### Session Flow
-
-1. User sends command (e.g., `/copilot`)
-2. AccessControl middleware verifies user
-3. CoderBot/XtermBot handles command
-4. XtermService creates PTY session
-5. User interacts via text messages
-6. Commands sent to PTY process
-7. Output buffered and rendered on demand
-8. Screenshot generated via Puppeteer
-9. Image sent back to user via Telegram
-
-### File Watching Flow
-
-1. MediaWatcherService monitors directory
-2. File detected (via chokidar)
-3. File sent to all allowed users
-4. File moved to 'sent' subfolder
-5. Ready for next file
 
 ## Media File Watcher
 
@@ -832,31 +549,6 @@ The bot includes an automatic media file watcher that monitors a specified direc
 Set the `MEDIA_TMP_LOCATION` environment variable (defaults to `/tmp/coderBOT_media`).
 
 The directories are automatically created on bot startup if they don't exist.
-
-### Usage Examples
-
-**Manual file copy:**
-```bash
-cp /path/to/file.jpg /tmp/coderBOT_media/
-# Bot automatically sends it and moves to sent/
-```
-
-**Using [media] placeholder in AI commands:**
-```
-You: generate a chart and save it to [media]/chart.png
-# The AI saves the file to the media directory
-# Bot automatically detects and sends it
-```
-
-**From within the terminal session:**
-```bash
-You: /keys wget https://example.com/image.png -O [media]/image.png
-You: /enter
-# File downloads to media directory
-# Bot automatically sends it
-```
-
-
 
 ## Troubleshooting
 
@@ -961,65 +653,6 @@ You: /enter
 3. Verify CLI tool authentication is configured
 4. Try `/xterm` then manually start the tool to see error messages
 5. Check terminal output for authentication or configuration errors
-
-## Common Use Cases
-
-### Use Case 1: Code Review with AI
-
-```
-You: /copilot
-You: review this file: src/app.ts
-AI: [Provides code review]
-You: /2  # Select option 2 from AI menu
-```
-
-### Use Case 2: Generate and Receive Diagram
-
-```
-You: /claude
-You: create a system architecture diagram and save to [media]/architecture.png
-AI: [Generates diagram]
-Bot: 📁 [Automatically sends architecture.png]
-```
-
-### Use Case 3: Debug Running Process
-
-```
-You: /xterm
-You: node index.js
-# Process starts...
-You: /ctrlc  # Stop the process
-You: /screen  # View output
-```
-
-### Use Case 4: Batch File Processing
-
-```
-You: /xterm
-You: for f in *.jpg; do convert $f -resize 50% [media]/$f; done
-# Bot automatically sends each resized image
-```
-
-## Contributing
-
-This project is maintained as a published npm package. To contribute:
-
-1. **Report Issues**: [GitHub Issues](https://github.com/Tommertom/coderBOT/issues)
-2. **Feature Requests**: Open an issue with your suggestion
-3. **Bug Reports**: Include steps to reproduce and your environment details
-
-## Support
-
-For issues and questions:
-- **GitHub Issues**: [Report bugs or request features](https://github.com/Tommertom/coderBOT/issues)
-- **Troubleshooting**: See the Troubleshooting section above
-- **NPM Package**: [@tommertom/coderbot](https://www.npmjs.com/package/@tommertom/coderbot)
-
-## Links
-
-- **NPM Package**: [@tommertom/coderbot](https://www.npmjs.com/package/@tommertom/coderbot)
-- **GitHub Repository**: [Tommertom/coderBOT](https://github.com/Tommertom/coderBOT)
-- **Documentation**: [Multi-Process Architecture](docs/multi-process-architecture.md)
 
 ---
 
