@@ -6,6 +6,7 @@ import { createMediaWatcherService } from './features/media/media-watcher.servic
 import { AccessControlMiddleware } from './middleware/access-control.middleware.js';
 import { ConfigService } from './services/config.service.js';
 import { IPCMessage, IPCMessageType } from './types/ipc.types.js';
+import { CommandMenuUtils } from './utils/command-menu.utils.js';
 import dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -100,17 +101,7 @@ async function startWorker() {
         xtermBot.registerHandlers(bot);
 
         // Set initial bot commands (before session)
-        await bot.api.setMyCommands([
-            { command: 'screen', description: 'Capture and view terminal screenshot' },
-            { command: 'help', description: 'Show complete command reference' },
-            { command: 'tab', description: 'Send Tab character' },
-            { command: 'enter', description: 'Send Enter key' },
-            { command: 'ctrlc', description: 'Send Ctrl+C (interrupt)' },
-            { command: 'copilot', description: 'Start a new terminal session with Copilot' },
-            { command: 'claude', description: 'Start a new terminal session with Claude' },
-            { command: 'cursor', description: 'Start a new terminal session with Cursor' },
-            { command: 'start', description: 'Show help message with all commands' },
-        ]);
+        await CommandMenuUtils.setNoSessionCommands(bot);
 
         // Start the bot
         await bot.start();

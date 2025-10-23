@@ -351,16 +351,14 @@ process.on('uncaughtException', (error) => {
     gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 
-// Start all bot workers
-startBotWorkers().then(async () => {
-    console.log(`[Parent] ✅ CoderBot parent process ready with ${botWorkers.length} worker(s)`);
-
-    // Start new ProcessManager-based workers
-    await startBotWorkersWithProcessManager();
+// Start all bot workers using ProcessManager only (not the old botWorkers system)
+startBotWorkersWithProcessManager().then(async () => {
+    console.log(`[Parent] ✅ CoderBot parent process ready`);
 
     // Initialize Control Bot
     await initializeControlBot();
 
-    // Start monitoring for token changes
-    startBotTokenMonitoring();
+    // Start monitoring for token changes (currently monitors .env file)
+    // Note: ProcessManager handles bot lifecycle, not the old botWorkers system
+    // startBotTokenMonitoring();
 }).catch(console.error);
