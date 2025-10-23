@@ -1,0 +1,51 @@
+import { Bot } from 'grammy';
+import type { BotCommand } from '@grammyjs/types';
+
+/**
+ * Utility for managing dynamic bot command menus
+ */
+export class CommandMenuUtils {
+    private static readonly COMMANDS_NO_SESSION: BotCommand[] = [
+        { command: 'screen', description: 'Capture and view terminal screenshot' },
+        { command: 'help', description: 'Show complete command reference' },
+        { command: 'tab', description: 'Send Tab character' },
+        { command: 'enter', description: 'Send Enter key' },
+        { command: 'ctrlc', description: 'Send Ctrl+C (interrupt)' },
+        { command: 'copilot', description: 'Start a new terminal session with Copilot' },
+        { command: 'claude', description: 'Start a new terminal session with Claude' },
+        { command: 'cursor', description: 'Start a new terminal session with Cursor' },
+        { command: 'start', description: 'Show help message with all commands' },
+    ];
+
+    private static readonly COMMANDS_WITH_SESSION: BotCommand[] = [
+        { command: 'screen', description: 'Capture and view terminal screenshot' },
+        { command: 'help', description: 'Show complete command reference' },
+        { command: 'tab', description: 'Send Tab character' },
+        { command: 'enter', description: 'Send Enter key' },
+        { command: 'ctrlc', description: 'Send Ctrl+C (interrupt)' },
+        { command: 'close', description: 'Close the current terminal session' },
+        { command: 'start', description: 'Show help message with all commands' },
+    ];
+
+    /**
+     * Update command menu to show session commands (with /close, without AI assistants)
+     */
+    static async setSessionCommands(bot: Bot): Promise<void> {
+        try {
+            await bot.api.setMyCommands(CommandMenuUtils.COMMANDS_WITH_SESSION);
+        } catch (error) {
+            console.error('Failed to update command menu to session mode:', error);
+        }
+    }
+
+    /**
+     * Update command menu to show no-session commands (with AI assistants, without /close)
+     */
+    static async setNoSessionCommands(bot: Bot): Promise<void> {
+        try {
+            await bot.api.setMyCommands(CommandMenuUtils.COMMANDS_NO_SESSION);
+        } catch (error) {
+            console.error('Failed to update command menu to no-session mode:', error);
+        }
+    }
+}

@@ -6,6 +6,7 @@ import { AccessControlMiddleware } from '../../middleware/access-control.middlew
 import { MessageUtils } from '../../utils/message.utils.js';
 import { ErrorUtils } from '../../utils/error.utils.js';
 import { ScreenRefreshUtils } from '../../utils/screen-refresh.utils.js';
+import { CommandMenuUtils } from '../../utils/command-menu.utils.js';
 import { Messages, SuccessMessages, ErrorActions } from '../../constants/messages.js';
 
 export class XtermBot {
@@ -66,6 +67,10 @@ export class XtermBot {
     registerHandlers(bot: Bot): void {
         this.bot = bot;
         bot.command('xterm', AccessControlMiddleware.requireAccess, this.handleXterm.bind(this));
+        bot.command('copilot', AccessControlMiddleware.requireAccess, this.handleCopilot.bind(this));
+        bot.command('claude', AccessControlMiddleware.requireAccess, this.handleClaude.bind(this));
+        bot.command('cursor', AccessControlMiddleware.requireAccess, this.handleCursor.bind(this));
+        bot.command('send', AccessControlMiddleware.requireAccess, this.handleSend.bind(this));
         bot.command('keys', AccessControlMiddleware.requireAccess, this.handleKeys.bind(this));
         bot.command('tab', AccessControlMiddleware.requireAccess, this.handleTab.bind(this));
         bot.command('enter', AccessControlMiddleware.requireAccess, this.handleEnter.bind(this));
@@ -84,6 +89,8 @@ export class XtermBot {
         bot.command('3', AccessControlMiddleware.requireAccess, this.handleNumberKey.bind(this, '3'));
         bot.command('4', AccessControlMiddleware.requireAccess, this.handleNumberKey.bind(this, '4'));
         bot.command('5', AccessControlMiddleware.requireAccess, this.handleNumberKey.bind(this, '5'));
+        bot.on('callback_query:data', AccessControlMiddleware.requireAccess, this.handleCallbackQuery.bind(this));
+        bot.on('message:text', AccessControlMiddleware.requireAccess, this.handleTextMessage.bind(this));
     }
 
     /**
@@ -114,6 +121,39 @@ export class XtermBot {
                 this.xtermRendererService,
                 this.configService
             );
+        }
+    }
+
+    /**
+     * Helper method to send terminal screenshot with inline keyboard
+     */
+    private async sendSessionScreenshot(ctx: Context, userId: string): Promise<void> {
+        const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
+        const dimensions = this.xtermService.getSessionDimensions(userId);
+
+        const imageBuffer = await this.xtermRendererService.renderToImage(
+            outputBuffer,
+            dimensions.rows,
+            dimensions.cols
+        );
+
+        const inlineKeyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
+
+        const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
+            reply_markup: inlineKeyboard,
+        });
+
+        this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
+    }
+
+    /**
+     * Helper method to safely answer callback queries with error handling
+     */
+    private async safeAnswerCallbackQuery(ctx: Context, text: string): Promise<void> {
+        try {
+            await ctx.answerCallbackQuery({ text });
+        } catch (error) {
+            console.error('Failed to answer callback query:', error);
         }
     }
 
@@ -193,36 +233,25 @@ export class XtermBot {
 
         try {
             if (this.xtermService.hasSession(userId)) {
-                await ctx.reply(Messages.SESSION_ALREADY_EXISTS);
+                const sentMsg = await ctx.reply(Messages.SESSION_ALREADY_EXISTS);
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
                 return;
             }
 
+            // Create session without data handlers - xterm is a raw terminal (no copilot monitoring)
             this.xtermService.createSession(userId, chatId);
 
-            await ctx.reply(
-                '🖥️ *Terminal Session Started*\n\n' +
-                '✅ Bash session is now active.\n\n' +
-                '*Available Commands:*\n' +
-                '/send <text> - Send text to terminal with Enter\n' +
-                'Send any message - Sent directly to terminal with Enter\n' +
-                '/keys <text> - Send text without Enter\n' +
-                '/tab - Send Tab character\n' +
-                '/enter - Send Enter key\n' +
-                '/space - Send Space character\n' +
-                '/delete - Send Delete key\n' +
-                '/ctrl <char> - Send Ctrl+character (e.g., /ctrl c for Ctrl+C)\n' +
-                '/ctrlc - Send Ctrl+C (shortcut)\n' +
-                '/ctrlx - Send Ctrl+X (shortcut)\n' +
-                '/esc - Send Escape key\n' +
-                '/screen - Capture terminal screenshot\n' +
-                '/close - Close the terminal session\n\n' +
-                '🔔 *Notifications:* You will receive automatic notifications when the terminal sends a BEL signal.\n\n' +
-                '⚠️ *Security Note:* This terminal has access to the bot\'s environment. ' +
-                'Be cautious with commands and avoid exposing sensitive data.',
-                { parse_mode: 'Markdown' }
-            );
+            // Update command menu to show /close instead of AI assistants
+            if (this.bot) {
+                await CommandMenuUtils.setSessionCommands(this.bot);
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Send initial screenshot showing the bash prompt
+            await this.sendSessionScreenshot(ctx, userId);
         } catch (error) {
-            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.CREATE_TERMINAL, error));
+            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.START_TERMINAL, error));
         }
     }
 
@@ -248,7 +277,8 @@ export class XtermBot {
 
                 this.xtermService.writeRawToSession(userId, keys);
 
-                await ctx.reply(`✅ Sent keys: \`${keys}\`\n\n${Messages.VIEW_SCREEN_HINT}`, { parse_mode: 'Markdown' });
+                const sentMsg = await ctx.reply(`✅ Sent keys: \`${keys}\`\n\n${Messages.VIEW_SCREEN_HINT}`, { parse_mode: 'Markdown' });
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
                 this.triggerAutoRefresh(userId, chatId);
             } catch (error) {
                 await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_KEYS, error));
@@ -416,7 +446,11 @@ export class XtermBot {
                     dimensions.cols
                 );
 
-                await ctx.api.deleteMessage(ctx.chat!.id, statusMsg.message_id);
+                try {
+                    await ctx.api.deleteMessage(ctx.chat!.id, statusMsg.message_id);
+                } catch (error) {
+                    console.error('Failed to delete status message:', error);
+                }
 
                 const keyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
 
@@ -424,7 +458,6 @@ export class XtermBot {
                     reply_markup: keyboard,
                 });
 
-                // Store the message ID for future updates
                 this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
             } catch (error) {
                 await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.CAPTURE_SCREEN, error));
@@ -459,5 +492,202 @@ export class XtermBot {
                 await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_KEY, error));
             }
         });
+    }
+
+    private async handleSend(ctx: Context): Promise<void> {
+        const userId = ctx.from!.id.toString();
+        const chatId = ctx.chat!.id;
+
+        await this.requireActiveSession(ctx, userId, async () => {
+            try {
+                const message = ctx.message?.text || '';
+                const text = message.replace('/send', '').trim();
+
+                if (!text) {
+                    await ctx.reply(
+                        '⚠️ Please provide text to send.\n\n' +
+                        '*Usage:* `/send <text>`\n' +
+                        '*Example:* `/send ls -la`',
+                        { parse_mode: 'Markdown' }
+                    );
+                    return;
+                }
+
+                this.xtermService.writeRawToSession(userId, text);
+
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                this.xtermService.writeRawToSession(userId, '\r');
+
+                const sentMsg = await ctx.reply(`✅ Sent - ${Messages.VIEW_SCREEN_HINT}`);
+
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+
+                this.triggerAutoRefresh(userId, chatId);
+            } catch (error) {
+                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
+            }
+        });
+    }
+
+    /**
+     * Generic handler for AI assistant commands (copilot, claude, cursor)
+     */
+    private async handleAIAssistant(
+        ctx: Context,
+        assistantType: 'copilot' | 'claude' | 'cursor'
+    ): Promise<void> {
+        const userId = ctx.from!.id.toString();
+        const chatId = ctx.chat!.id;
+
+        try {
+            if (this.xtermService.hasSession(userId)) {
+                const sentMsg = await ctx.reply(Messages.SESSION_ALREADY_EXISTS);
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+                return;
+            }
+
+            // Create session without data handlers - xterm doesn't monitor for AI prompts
+            this.xtermService.createSession(userId, chatId);
+
+            // Update command menu to show /close instead of AI assistants
+            if (this.bot) {
+                await CommandMenuUtils.setSessionCommands(this.bot);
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Automatically run the AI assistant command
+            this.xtermService.writeToSession(userId, assistantType);
+
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Send initial screenshot
+            await this.sendSessionScreenshot(ctx, userId);
+        } catch (error) {
+            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.START_TERMINAL, error));
+        }
+    }
+
+    private async handleCopilot(ctx: Context): Promise<void> {
+        await this.handleAIAssistant(ctx, 'copilot');
+    }
+
+    private async handleClaude(ctx: Context): Promise<void> {
+        await this.handleAIAssistant(ctx, 'claude');
+    }
+
+    private async handleCursor(ctx: Context): Promise<void> {
+        await this.handleAIAssistant(ctx, 'cursor');
+    }
+
+    private async handleCallbackQuery(ctx: Context): Promise<void> {
+        const callbackData = ctx.callbackQuery?.data;
+
+        if (!callbackData) {
+            await this.safeAnswerCallbackQuery(ctx, Messages.INVALID_CALLBACK);
+            return;
+        }
+
+        const userId = ctx.from!.id.toString();
+        const chatId = ctx.chat!.id;
+
+        try {
+            if (callbackData === 'refresh_screen') {
+                if (!this.xtermService.hasSession(userId)) {
+                    await this.safeAnswerCallbackQuery(ctx, Messages.NO_ACTIVE_TERMINAL_SESSION);
+                    return;
+                }
+
+                await this.safeAnswerCallbackQuery(ctx, Messages.REFRESHING);
+
+                const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
+                const dimensions = this.xtermService.getSessionDimensions(userId);
+
+                const imageBuffer = await this.xtermRendererService.renderToImage(
+                    outputBuffer,
+                    dimensions.rows,
+                    dimensions.cols
+                );
+
+                const keyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
+
+                if (ctx.callbackQuery?.message) {
+                    await ctx.editMessageMedia({
+                        type: 'photo',
+                        media: new InputFile(imageBuffer),
+                    }, {
+                        reply_markup: keyboard,
+                    });
+                }
+                return;
+            }
+
+            if (!this.xtermService.hasSession(userId)) {
+                await this.safeAnswerCallbackQuery(ctx, Messages.NO_ACTIVE_TERMINAL_SESSION);
+                return;
+            }
+
+            if (callbackData.match(/^\/[1-5]$/)) {
+                const number = callbackData.substring(1);
+                this.xtermService.writeRawToSession(userId, number);
+                await this.safeAnswerCallbackQuery(ctx, SuccessMessages.SENT(number));
+            } else if (callbackData.startsWith('/')) {
+                const command = callbackData.substring(1);
+                this.xtermService.writeToSession(userId, command);
+                await this.safeAnswerCallbackQuery(ctx, `✅ Executed: /${command}`);
+            } else {
+                await this.safeAnswerCallbackQuery(ctx, '❌ Unknown option');
+            }
+        } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+            const maxLength = 185;
+            const truncatedMsg = errorMsg.length > maxLength ? errorMsg.substring(0, maxLength) + '...' : errorMsg;
+            try {
+                await ctx.answerCallbackQuery({ text: `❌ ${truncatedMsg}` });
+            } catch (answerError) {
+                try {
+                    await ctx.answerCallbackQuery({ text: '❌ Operation failed' });
+                } catch (finalError) {
+                    console.error('Failed to answer callback query even with minimal message:', finalError);
+                }
+            }
+        }
+    }
+
+    private async handleTextMessage(ctx: Context, next: () => Promise<void>): Promise<void> {
+        let text = ctx.message?.text || '';
+
+        if (text.startsWith('/')) {
+            return next();
+        }
+
+        if (text.startsWith('.')) {
+            text = text.substring(1);
+        }
+
+        const userId = ctx.from!.id.toString();
+        const chatId = ctx.chat!.id;
+
+        try {
+            if (!this.xtermService.hasSession(userId)) {
+                await ctx.reply(Messages.NO_ACTIVE_SESSION);
+                return;
+            }
+
+            this.xtermService.writeRawToSession(userId, text);
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            this.xtermService.writeRawToSession(userId, '\r');
+
+            const sentMsg = await ctx.reply(`✅ Sent - ${Messages.VIEW_SCREEN_HINT}`);
+
+            await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+
+            this.triggerAutoRefresh(userId, chatId);
+        } catch (error) {
+            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
+        }
     }
 }

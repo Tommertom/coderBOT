@@ -99,7 +99,7 @@ async function startWorker() {
         coderBot.registerHandlers(bot);
         xtermBot.registerHandlers(bot);
 
-        // Set bot commands
+        // Set initial bot commands (before session)
         await bot.api.setMyCommands([
             { command: 'screen', description: 'Capture and view terminal screenshot' },
             { command: 'help', description: 'Show complete command reference' },
@@ -110,7 +110,6 @@ async function startWorker() {
             { command: 'claude', description: 'Start a new terminal session with Claude' },
             { command: 'cursor', description: 'Start a new terminal session with Cursor' },
             { command: 'start', description: 'Show help message with all commands' },
-            { command: 'close', description: 'Close the current terminal session' },
         ]);
 
         // Start the bot

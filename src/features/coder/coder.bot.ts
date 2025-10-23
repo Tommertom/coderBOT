@@ -7,6 +7,7 @@ import { AccessControlMiddleware } from '../../middleware/access-control.middlew
 import { MessageUtils } from '../../utils/message.utils.js';
 import { ErrorUtils } from '../../utils/error.utils.js';
 import { ScreenRefreshUtils } from '../../utils/screen-refresh.utils.js';
+import { CommandMenuUtils } from '../../utils/command-menu.utils.js';
 import { Messages, SuccessMessages, ErrorActions } from '../../constants/messages.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -57,11 +58,9 @@ export class CoderBot {
         this.bot = bot;
         bot.command('start', AccessControlMiddleware.requireAccess, this.handleStart.bind(this));
         bot.command('help', AccessControlMiddleware.requireAccess, this.handleHelp.bind(this));
-        bot.command('copilot', AccessControlMiddleware.requireAccess, this.handleCopilot.bind(this));
-        bot.command('claude', AccessControlMiddleware.requireAccess, this.handleClaude.bind(this));
-        bot.command('cursor', AccessControlMiddleware.requireAccess, this.handleCursor.bind(this));
-        bot.command('send', AccessControlMiddleware.requireAccess, this.handleSend.bind(this));
+        bot.command('esc', AccessControlMiddleware.requireAccess, this.handleEsc.bind(this));
         bot.command('close', AccessControlMiddleware.requireAccess, this.handleClose.bind(this));
+        bot.command('send', AccessControlMiddleware.requireAccess, this.handleSend.bind(this));
         bot.command('killbot', AccessControlMiddleware.requireAccess, this.handleKillbot.bind(this));
         bot.command('urls', AccessControlMiddleware.requireAccess, this.handleUrls.bind(this));
         bot.on('callback_query:data', AccessControlMiddleware.requireAccess, this.handleCallbackQuery.bind(this));
@@ -478,6 +477,35 @@ export class CoderBot {
         }
     }
 
+    private async handleEsc(ctx: Context): Promise<void> {
+        const userId = ctx.from!.id.toString();
+        const chatId = ctx.chat!.id;
+
+        try {
+            if (!this.xtermService.hasSession(userId)) {
+                await ctx.reply(Messages.NO_ACTIVE_SESSION);
+                return;
+            }
+
+            this.xtermService.writeRawToSession(userId, '\x1b');
+            const sentMsg = await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY('Escape key'));
+            await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+
+            if (this.bot) {
+                ScreenRefreshUtils.startAutoRefresh(
+                    userId,
+                    chatId,
+                    this.bot,
+                    this.xtermService,
+                    this.xtermRendererService,
+                    this.configService
+                );
+            }
+        } catch (error) {
+            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_ESCAPE, error));
+        }
+    }
+
     private async handleClose(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
         const chatId = ctx.chat!.id;
@@ -491,10 +519,15 @@ export class CoderBot {
             this.xtermService.closeSession(userId);
             this.coderService.clearBuffer(userId, chatId);
 
+            // Update command menu to show AI assistants instead of /close
+            if (this.bot) {
+                await CommandMenuUtils.setNoSessionCommands(this.bot);
+            }
+
             await ctx.reply(
                 '✅ *Coder Session Closed*\n\n' +
                 'The coder session has been terminated.\n\n' +
-                'Use /start to start a new session.',
+                'Use /copilot, /claude, or /cursor to start a new session.',
                 { parse_mode: 'Markdown' }
             );
         } catch (error) {
@@ -507,13 +540,10 @@ export class CoderBot {
             '🤖 *Welcome to coderBOT!*\n\n' +
             'Your AI-powered terminal assistant is ready to help.\n\n' +
             '*Quick Start:*\n' +
-            '/copilot - Start a session with GitHub Copilot\n' +
-            '/claude - Start a session with Claude AI\n' +
-            '/cursor - Start a session with Cursor AI\n\n' +
-            '*Other Commands:*\n' +
-            '/screen - View terminal output\n' +
-            '/close - Close your session\n' +
-            '/help - Show many more commands\n\n' +
+            '/help - Show all available commands\n' +
+            '/esc - Send Escape key\n' +
+            '/close - Close your session\n\n' +
+            'Send any message to interact with the terminal.\n\n' +
             'Happy coding! 🚀',
             { parse_mode: 'Markdown' }
         );
@@ -525,28 +555,14 @@ export class CoderBot {
         const sentMsg = await ctx.reply(
             '🤖 *Coder Bot - Complete Command Reference*\n\n' +
             '*Session Management:*\n' +
-            '/copilot - Start a new session with GitHub Copilot\n' +
-            '/claude - Start a new session with Claude AI\n' +
-            '/cursor - Start a new session with Cursor AI\n' +
             '/close - Close the current terminal session\n\n' +
-            '/xterm - Start a raw bash terminal session\n' +
             '*Sending Text to Terminal:*\n' +
             'Type any message (not starting with /) - Sent directly to terminal with Enter\n' +
             '.command - Send command (dot prefix removed, Enter added automatically)\n' +
             '/send <text> - Send text to terminal with Enter\n' +
-            '/keys <text> - Send text without pressing Enter\n' +
             '*Tip:* Use \\[media\\] in your text - it will be replaced with the media directory path\n\n' +
             '*Special Keys:*\n' +
-            '/tab - Send Tab character\n' +
-            '/enter - Send Enter key\n' +
-            '/space - Send Space character\n' +
-            '/ctrl <char> - Send Ctrl+character (e.g., /ctrl c for Ctrl+C)\n' +
-            '/ctrlc - Send Ctrl+C (interrupt)\n' +
-            '/ctrlx - Send Ctrl+X\n' +
-            '/esc - Send Escape key\n' +
-            '/arrowup - Send Arrow Up key\n' +
-            '/arrowdown - Send Arrow Down key\n' +
-            '/1 /2 /3 /4 /5 - Send number keys (for menu selections)\n\n' +
+            '/esc - Send Escape key\n\n' +
             '*Viewing Output:*\n' +
             '/screen - Capture and view terminal screenshot\n' +
             '/urls - Show all URLs found in terminal output\n' +
@@ -560,7 +576,7 @@ export class CoderBot {
             '/start - Show quick start guide\n' +
             '/help - Show this detailed help\n' +
             '/killbot - Shutdown the bot\n\n' +
-            '💡 *Pro Tip:* Most commands work only when you have an active session. Start one with /copilot or /claude!',
+            '💡 *Pro Tip:* Send messages directly to interact with the terminal!',
             { parse_mode: 'Markdown' }
         );
 
