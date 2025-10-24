@@ -93,25 +93,28 @@ export class ControlBot {
             const statuses = this.processManager.getAllBotStatuses();
 
             if (statuses.length === 0) {
-                await ctx.reply('📊 *Bot Status*\n\nNo worker bots configured.', {
+                const msg = await ctx.reply('📊 *Bot Status*\n\nNo worker bots configured.', {
                     parse_mode: 'Markdown',
                 });
+                await MessageUtils.scheduleMessageDeletion(ctx, msg.message_id, this.configService, 60);
                 return;
             }
 
             // Send summary first
             const runningCount = statuses.filter(s => s.status === 'running').length;
-            await ctx.reply(
+            const summaryMsg = await ctx.reply(
                 `📊 *Worker Bot Status*\n\n*Summary:* ${runningCount}/${statuses.length} bots running`,
                 { parse_mode: 'Markdown' }
             );
+            await MessageUtils.scheduleMessageDeletion(ctx, summaryMsg.message_id, this.configService, 60);
 
             // Send individual message for each bot with action buttons
             for (const status of statuses) {
                 await this.sendBotStatus(ctx, status);
             }
         } catch (error) {
-            await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            const errMsg = await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            await MessageUtils.scheduleMessageDeletion(ctx, errMsg.message_id, this.configService, 60);
         }
     }
 
@@ -429,10 +432,11 @@ export class ControlBot {
 
         keyboard.text('📋 Logs', `logs:${status.botId}`);
 
-        await ctx.reply(message, {
+        const msg = await ctx.reply(message, {
             parse_mode: 'Markdown',
             reply_markup: keyboard
         });
+        await MessageUtils.scheduleMessageDeletion(ctx, msg.message_id, this.configService, 60);
     }
 
     private async handleCallback(ctx: Context): Promise<void> {
@@ -470,27 +474,32 @@ export class ControlBot {
             const status = this.processManager.getBotStatus(botId);
 
             if (!status) {
-                await ctx.reply(`❌ Bot \`${botId}\` not found.`, { parse_mode: 'Markdown' });
+                const msg = await ctx.reply(`❌ Bot \`${botId}\` not found.`, { parse_mode: 'Markdown' });
+                await MessageUtils.scheduleMessageDeletion(ctx, msg.message_id, this.configService, 60);
                 return;
             }
 
             if (status.status === 'running') {
-                await ctx.reply(`⚠️ Bot \`${botId}\` is already running.`, { parse_mode: 'Markdown' });
+                const msg = await ctx.reply(`⚠️ Bot \`${botId}\` is already running.`, { parse_mode: 'Markdown' });
+                await MessageUtils.scheduleMessageDeletion(ctx, msg.message_id, this.configService, 60);
                 return;
             }
 
-            await ctx.reply(`⏳ Starting bot \`${botId}\`...`, { parse_mode: 'Markdown' });
+            const startingMsg = await ctx.reply(`⏳ Starting bot \`${botId}\`...`, { parse_mode: 'Markdown' });
+            await MessageUtils.scheduleMessageDeletion(ctx, startingMsg.message_id, this.configService, 60);
 
             const tokens = await this.configManager.getBotTokens();
             const botIndex = parseInt(botId.replace('bot-', ''), 10) - 1;
 
             if (botIndex < 0 || botIndex >= tokens.length) {
-                await ctx.reply(`❌ Invalid bot index for \`${botId}\`.`, { parse_mode: 'Markdown' });
+                const msg = await ctx.reply(`❌ Invalid bot index for \`${botId}\`.`, { parse_mode: 'Markdown' });
+                await MessageUtils.scheduleMessageDeletion(ctx, msg.message_id, this.configService, 60);
                 return;
             }
 
             await this.processManager.startBot(botId, tokens[botIndex]);
-            await ctx.reply(`✅ Bot \`${botId}\` started successfully!`, { parse_mode: 'Markdown' });
+            const successMsg = await ctx.reply(`✅ Bot \`${botId}\` started successfully!`, { parse_mode: 'Markdown' });
+            await MessageUtils.scheduleMessageDeletion(ctx, successMsg.message_id, this.configService, 60);
 
             // Send updated status
             setTimeout(async () => {
@@ -507,13 +516,16 @@ export class ControlBot {
     private async handleStopBot(ctx: Context, botId: string): Promise<void> {
         try {
             if (!this.processManager.isBotRunning(botId)) {
-                await ctx.reply(`⚠️ Bot \`${botId}\` is not running.`, { parse_mode: 'Markdown' });
+                const msg = await ctx.reply(`⚠️ Bot \`${botId}\` is not running.`, { parse_mode: 'Markdown' });
+                await MessageUtils.scheduleMessageDeletion(ctx, msg.message_id, this.configService, 60);
                 return;
             }
 
-            await ctx.reply(`⏳ Stopping bot \`${botId}\`...`, { parse_mode: 'Markdown' });
+            const stoppingMsg = await ctx.reply(`⏳ Stopping bot \`${botId}\`...`, { parse_mode: 'Markdown' });
+            await MessageUtils.scheduleMessageDeletion(ctx, stoppingMsg.message_id, this.configService, 60);
             await this.processManager.stopBot(botId);
-            await ctx.reply(`✅ Bot \`${botId}\` stopped successfully!`, { parse_mode: 'Markdown' });
+            const successMsg = await ctx.reply(`✅ Bot \`${botId}\` stopped successfully!`, { parse_mode: 'Markdown' });
+            await MessageUtils.scheduleMessageDeletion(ctx, successMsg.message_id, this.configService, 60);
 
             // Send updated status
             const updatedStatus = this.processManager.getBotStatus(botId);
@@ -521,16 +533,19 @@ export class ControlBot {
                 await this.sendBotStatus(ctx, updatedStatus);
             }
         } catch (error) {
-            await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            const errMsg = await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            await MessageUtils.scheduleMessageDeletion(ctx, errMsg.message_id, this.configService, 60);
         }
     }
 
     private async handleRestartBot(ctx: Context, botId: string): Promise<void> {
         try {
-            await ctx.reply(`⏳ Restarting bot \`${botId}\`...`, { parse_mode: 'Markdown' });
+            const restartingMsg = await ctx.reply(`⏳ Restarting bot \`${botId}\`...`, { parse_mode: 'Markdown' });
+            await MessageUtils.scheduleMessageDeletion(ctx, restartingMsg.message_id, this.configService, 60);
 
             await this.processManager.restartBot(botId);
-            await ctx.reply(`✅ Bot \`${botId}\` restarted successfully!`, { parse_mode: 'Markdown' });
+            const successMsg = await ctx.reply(`✅ Bot \`${botId}\` restarted successfully!`, { parse_mode: 'Markdown' });
+            await MessageUtils.scheduleMessageDeletion(ctx, successMsg.message_id, this.configService, 60);
 
             // Send updated status
             setTimeout(async () => {
@@ -540,7 +555,8 @@ export class ControlBot {
                 }
             }, 1000);
         } catch (error) {
-            await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            const errMsg = await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            await MessageUtils.scheduleMessageDeletion(ctx, errMsg.message_id, this.configService, 60);
         }
     }
 
@@ -548,7 +564,8 @@ export class ControlBot {
         const logs = this.processManager.getBotLogs(botId, lines);
 
         if (logs.length === 0) {
-            await ctx.reply(`📋 No logs available for \`${botId}\`.`, { parse_mode: 'Markdown' });
+            const msg = await ctx.reply(`📋 No logs available for \`${botId}\`.`, { parse_mode: 'Markdown' });
+            await MessageUtils.scheduleMessageDeletion(ctx, msg.message_id, this.configService, 60);
             return;
         }
 
@@ -557,9 +574,11 @@ export class ControlBot {
 
         if (logsText.length > maxLength) {
             const truncated = logsText.substring(logsText.length - maxLength);
-            await ctx.reply(`📋 *Logs for ${botId}* (truncated):\n\`\`\`\n${truncated}\n\`\`\``, { parse_mode: 'Markdown' });
+            const msg = await ctx.reply(`📋 *Logs for ${botId}* (truncated):\n\`\`\`\n${truncated}\n\`\`\``, { parse_mode: 'Markdown' });
+            await MessageUtils.scheduleMessageDeletion(ctx, msg.message_id, this.configService, 60);
         } else {
-            await ctx.reply(`📋 *Logs for ${botId}:*\n\`\`\`\n${logsText}\n\`\`\``, { parse_mode: 'Markdown' });
+            const msg = await ctx.reply(`📋 *Logs for ${botId}:*\n\`\`\`\n${logsText}\n\`\`\``, { parse_mode: 'Markdown' });
+            await MessageUtils.scheduleMessageDeletion(ctx, msg.message_id, this.configService, 60);
         }
     }
 
