@@ -18,7 +18,7 @@
     "start": "node ./dist/cli.js",
     "watch": "tsc --watch",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "doPublish": "npm run build && npm version minor && npm publish --access public",
+    "doPublish": "npm run build && npm version patch && npm publish --access public",
     "pm2:start": "npm run build && pm2 start ecosystem.config.cjs",
     "pm2:stop": "pm2 stop coderBOT",
     "pm2:restart": "npm run build && pm2 restart coderBOT",
