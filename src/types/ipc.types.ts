@@ -9,6 +9,7 @@ export enum IPCMessageType {
     LOG_MESSAGE = 'log_message',
     ERROR = 'error',
     STATUS_UPDATE = 'status_update',
+    BOT_INFO = 'bot_info',
 }
 
 export interface IPCMessage {
@@ -22,4 +23,9 @@ export interface HealthCheckResponse {
     healthy: boolean;
     uptime: number;
     memoryUsage: NodeJS.MemoryUsage;
+}
+
+export interface BotInfoData {
+    fullName: string;
+    username: string;
 }

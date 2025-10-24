@@ -103,7 +103,28 @@ async function startWorker() {
         // Set initial bot commands (before session)
         await CommandMenuUtils.setNoSessionCommands(bot);
 
-        // Start the bot
+        // Get bot info and send to parent BEFORE starting (so it's available immediately)
+        try {
+            const me = await bot.api.getMe();
+            const fullName = [me.first_name, me.last_name].filter(Boolean).join(" ");
+            console.log(`[Worker ${botId}] Bot info: ${fullName} (@${me.username})`);
+            
+            if (process.send) {
+                process.send({ 
+                    type: IPCMessageType.BOT_INFO, 
+                    botId,
+                    data: {
+                        fullName,
+                        username: me.username
+                    },
+                    timestamp: new Date()
+                });
+            }
+        } catch (error) {
+            console.error(`[Worker ${botId}] Failed to get bot info:`, error);
+        }
+
+        // Start the bot (this will block and keep running)
         await bot.start();
         console.log(`[Worker ${botId}] ✅ Bot started successfully`);
 

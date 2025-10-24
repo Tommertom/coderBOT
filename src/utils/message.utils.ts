@@ -32,4 +32,14 @@ export class MessageUtils {
             }
         }, deleteTimeout * timeoutMultiplier);
     }
+
+    /**
+     * Escapes special characters for Telegram's Markdown format
+     * @param text - The text to escape
+     * @returns The escaped text safe for use in Markdown messages
+     */
+    static escapeMarkdown(text: string): string {
+        // Escape special characters for Telegram's Markdown
+        return text.replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
+    }
 }

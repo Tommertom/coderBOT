@@ -1,8 +1,10 @@
-import { Bot, Context } from 'grammy';
+import { Bot, Context, InlineKeyboard } from 'grammy';
+import type { BotCommand } from '@grammyjs/types';
 import { ProcessManager, BotProcessInfo } from '../../services/process-manager.service.js';
 import { ConfigManager } from '../../services/config-manager.service.js';
 import { ConfigService } from '../../services/config.service.js';
 import { ControlAccessMiddleware } from '../../middleware/control-access.middleware.js';
+import { MessageUtils } from '../../utils/message.utils.js';
 
 export class ControlBot {
     private bot: Bot;
@@ -10,6 +12,12 @@ export class ControlBot {
     private configManager: ConfigManager;
     private configService: ConfigService;
     private startTime: Date;
+
+    private static readonly MY_COMMANDS: BotCommand[] = [
+        { command: 'status', description: 'Show status of all worker bots' },
+        { command: 'stopall', description: 'Stop all running bots' },
+        { command: 'help', description: 'Show complete command reference' },
+    ];
 
     constructor(
         token: string,
@@ -32,15 +40,14 @@ export class ControlBot {
 
         // Process Management
         this.bot.command('status', requireAdmin, this.handleStatus.bind(this));
-        this.bot.command('start', requireAdmin, this.handleStart.bind(this));
-        this.bot.command('stop', requireAdmin, this.handleStop.bind(this));
-        this.bot.command('restart', requireAdmin, this.handleRestart.bind(this));
         this.bot.command('stopall', requireAdmin, this.handleStopAll.bind(this));
         this.bot.command('startall', requireAdmin, this.handleStartAll.bind(this));
         this.bot.command('restartall', requireAdmin, this.handleRestartAll.bind(this));
 
+        // Callback query handler for inline buttons
+        this.bot.on('callback_query:data', requireAdmin, this.handleCallback.bind(this));
+
         // Bot Configuration
-        this.bot.command('listbots', requireAdmin, this.handleListBots.bind(this));
         this.bot.command('addbot', requireAdmin, this.handleAddBot.bind(this));
         this.bot.command('removebot', requireAdmin, this.handleRemoveBot.bind(this));
         this.bot.command('reload', requireAdmin, this.handleReload.bind(this));
@@ -62,8 +69,18 @@ export class ControlBot {
     }
 
     async start(): Promise<void> {
+        await this.setCommands();
         await this.bot.start();
         console.log('✅ ControlBOT is running');
+    }
+
+    private async setCommands(): Promise<void> {
+        try {
+            await this.bot.api.setMyCommands(ControlBot.MY_COMMANDS);
+            console.log('✅ ControlBOT commands set successfully');
+        } catch (error) {
+            console.error('Failed to set ControlBOT commands:', error);
+        }
     }
 
     async stop(): Promise<void> {
@@ -82,122 +99,17 @@ export class ControlBot {
                 return;
             }
 
-            let message = '📊 *Worker Bot Status*\n\n';
-
-            for (const status of statuses) {
-                const statusIcon = this.getStatusIcon(status.status);
-                const uptimeStr = this.formatUptime(status.uptime);
-
-                message += `${statusIcon} *${status.botId}*\n`;
-                message += `   Status: \`${status.status}\`\n`;
-                message += `   PID: \`${status.pid || 'N/A'}\`\n`;
-                message += `   Uptime: \`${uptimeStr}\`\n`;
-                
-                if (status.lastError) {
-                    message += `   Error: \`${status.lastError.substring(0, 100)}\`\n`;
-                }
-                
-                message += '\n';
-            }
-
+            // Send summary first
             const runningCount = statuses.filter(s => s.status === 'running').length;
-            message += `\n*Summary:* ${runningCount}/${statuses.length} bots running`;
+            await ctx.reply(
+                `📊 *Worker Bot Status*\n\n*Summary:* ${runningCount}/${statuses.length} bots running`,
+                { parse_mode: 'Markdown' }
+            );
 
-            await ctx.reply(message, { parse_mode: 'Markdown' });
-        } catch (error) {
-            await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    private async handleStart(ctx: Context): Promise<void> {
-        try {
-            const args = ctx.message?.text?.split(' ').slice(1) || [];
-            if (args.length === 0) {
-                await ctx.reply(
-                    '⚠️ Please specify a bot ID.\n\n' +
-                    '*Usage:* `/start <bot-id>`\n' +
-                    '*Example:* `/start bot-1`',
-                    { parse_mode: 'Markdown' }
-                );
-                return;
+            // Send individual message for each bot with action buttons
+            for (const status of statuses) {
+                await this.sendBotStatus(ctx, status);
             }
-
-            const botId = args[0];
-            const status = this.processManager.getBotStatus(botId);
-
-            if (!status) {
-                await ctx.reply(`❌ Bot \`${botId}\` not found.`, { parse_mode: 'Markdown' });
-                return;
-            }
-
-            if (status.status === 'running') {
-                await ctx.reply(`⚠️ Bot \`${botId}\` is already running.`, { parse_mode: 'Markdown' });
-                return;
-            }
-
-            await ctx.reply(`⏳ Starting bot \`${botId}\`...`, { parse_mode: 'Markdown' });
-
-            const tokens = await this.configManager.getBotTokens();
-            const botIndex = parseInt(botId.replace('bot-', ''), 10) - 1;
-            
-            if (botIndex < 0 || botIndex >= tokens.length) {
-                await ctx.reply(`❌ Invalid bot index for \`${botId}\`.`, { parse_mode: 'Markdown' });
-                return;
-            }
-
-            await this.processManager.startBot(botId, tokens[botIndex]);
-            await ctx.reply(`✅ Bot \`${botId}\` started successfully!`, { parse_mode: 'Markdown' });
-        } catch (error) {
-            await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    private async handleStop(ctx: Context): Promise<void> {
-        try {
-            const args = ctx.message?.text?.split(' ').slice(1) || [];
-            if (args.length === 0) {
-                await ctx.reply(
-                    '⚠️ Please specify a bot ID.\n\n' +
-                    '*Usage:* `/stop <bot-id>`\n' +
-                    '*Example:* `/stop bot-1`',
-                    { parse_mode: 'Markdown' }
-                );
-                return;
-            }
-
-            const botId = args[0];
-            
-            if (!this.processManager.isBotRunning(botId)) {
-                await ctx.reply(`⚠️ Bot \`${botId}\` is not running.`, { parse_mode: 'Markdown' });
-                return;
-            }
-
-            await ctx.reply(`⏳ Stopping bot \`${botId}\`...`, { parse_mode: 'Markdown' });
-            await this.processManager.stopBot(botId);
-            await ctx.reply(`✅ Bot \`${botId}\` stopped successfully!`, { parse_mode: 'Markdown' });
-        } catch (error) {
-            await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    private async handleRestart(ctx: Context): Promise<void> {
-        try {
-            const args = ctx.message?.text?.split(' ').slice(1) || [];
-            if (args.length === 0) {
-                await ctx.reply(
-                    '⚠️ Please specify a bot ID.\n\n' +
-                    '*Usage:* `/restart <bot-id>`\n' +
-                    '*Example:* `/restart bot-1`',
-                    { parse_mode: 'Markdown' }
-                );
-                return;
-            }
-
-            const botId = args[0];
-            await ctx.reply(`⏳ Restarting bot \`${botId}\`...`, { parse_mode: 'Markdown' });
-            
-            await this.processManager.restartBot(botId);
-            await ctx.reply(`✅ Bot \`${botId}\` restarted successfully!`, { parse_mode: 'Markdown' });
         } catch (error) {
             await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -243,37 +155,9 @@ export class ControlBot {
         try {
             const statuses = this.processManager.getAllBotStatuses();
             await ctx.reply(`⏳ Restarting all ${statuses.length} bots...`);
-            
+
             await this.processManager.restartAllBots();
             await ctx.reply('✅ All bots restarted successfully!');
-        } catch (error) {
-            await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    private async handleListBots(ctx: Context): Promise<void> {
-        try {
-            const tokens = await this.configManager.getBotTokens();
-            
-            if (tokens.length === 0) {
-                await ctx.reply('📋 *Bot List*\n\nNo bots configured.', { parse_mode: 'Markdown' });
-                return;
-            }
-
-            let message = '📋 *Configured Bots*\n\n';
-            
-            for (let i = 0; i < tokens.length; i++) {
-                const botId = `bot-${i + 1}`;
-                const maskedToken = this.maskToken(tokens[i]);
-                const status = this.processManager.getBotStatus(botId);
-                const statusIcon = status ? this.getStatusIcon(status.status) : '⚪';
-                
-                message += `${statusIcon} *${botId}*\n`;
-                message += `   Token: \`${maskedToken}\`\n`;
-                message += `   Status: \`${status?.status || 'not started'}\`\n\n`;
-            }
-
-            await ctx.reply(message, { parse_mode: 'Markdown' });
         } catch (error) {
             await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -381,7 +265,7 @@ export class ControlBot {
             const lines = args.length > 1 ? parseInt(args[1], 10) : 50;
 
             const logs = this.processManager.getBotLogs(botId, lines);
-            
+
             if (logs.length === 0) {
                 await ctx.reply(`📋 No logs available for \`${botId}\`.`, { parse_mode: 'Markdown' });
                 return;
@@ -401,7 +285,7 @@ export class ControlBot {
     private async handleHealth(ctx: Context): Promise<void> {
         try {
             const statuses = this.processManager.getAllBotStatuses();
-            
+
             if (statuses.length === 0) {
                 await ctx.reply('🏥 *Health Check*\n\nNo bots to check.', { parse_mode: 'Markdown' });
                 return;
@@ -410,7 +294,7 @@ export class ControlBot {
             await ctx.reply('⏳ Performing health checks...');
 
             let message = '🏥 *Health Check Results*\n\n';
-            
+
             for (const status of statuses) {
                 if (status.status === 'running') {
                     const healthy = await this.processManager.performHealthCheck(status.botId);
@@ -457,10 +341,10 @@ export class ControlBot {
             });
 
             console.log('Shutdown initiated by control bot');
-            
+
             await this.processManager.stopAllBots();
             await this.bot.stop();
-            
+
             setTimeout(() => {
                 console.log('Shutdown complete');
                 process.exit(0);
@@ -475,16 +359,12 @@ export class ControlBot {
 🎮 *ControlBOT Command Reference*
 
 *Process Management:*
-/status - Show status of all worker bots
-/start <bot-id> - Start a specific bot
-/stop <bot-id> - Stop a specific bot
-/restart <bot-id> - Restart a specific bot
+/status - Show status with action buttons
 /stopall - Stop all running bots
 /startall - Start all stopped bots
 /restartall - Restart all bots
 
 *Bot Configuration:*
-/listbots - List all configured bots
 /addbot <token> - Add and start a new bot
 /removebot <bot-id> - Remove a bot
 /reload - Reload .env configuration
@@ -499,9 +379,10 @@ export class ControlBot {
 /help - Show this help message
 
 *Examples:*
-\`/start bot-1\`
-\`/logs bot-2 100\`
+\`/logs bot-1 100\`
 \`/addbot 123456:ABCdef...\`
+
+*Note:* Use the inline buttons on status messages to start/stop/restart individual bots.
 `;
 
         await ctx.reply(message, { parse_mode: 'Markdown' });
@@ -514,6 +395,172 @@ export class ControlBot {
             'Use /help to see available commands.',
             { parse_mode: 'Markdown' }
         );
+    }
+
+    private async sendBotStatus(ctx: Context, status: BotProcessInfo): Promise<void> {
+        const statusIcon = this.getStatusIcon(status.status);
+        const uptimeStr = this.formatUptime(status.uptime);
+
+        let message = `${statusIcon} *${status.botId}*\n`;
+        if (status.fullName) {
+            message += `${MessageUtils.escapeMarkdown(status.fullName)}`;
+            if (status.username) {
+                message += ` (@${MessageUtils.escapeMarkdown(status.username)})`;
+            }
+            message += `\n`;
+        }
+        message += `Status: \`${status.status}\`\n`;
+        message += `PID: \`${status.pid || 'N/A'}\`\n`;
+        message += `Uptime: \`${uptimeStr}\``;
+
+        if (status.lastError) {
+            message += `\nError: \`${MessageUtils.escapeMarkdown(status.lastError.substring(0, 100))}\``;
+        }
+
+        // Create inline keyboard based on bot status
+        const keyboard = new InlineKeyboard();
+
+        if (status.status === 'running') {
+            keyboard.text('🔄 Restart', `restart:${status.botId}`);
+            keyboard.text('🛑 Stop', `stop:${status.botId}`);
+        } else {
+            keyboard.text('▶️ Start', `start:${status.botId}`);
+        }
+
+        keyboard.text('📋 Logs', `logs:${status.botId}`);
+
+        await ctx.reply(message, {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+        });
+    }
+
+    private async handleCallback(ctx: Context): Promise<void> {
+        try {
+            const data = ctx.callbackQuery?.data;
+            if (!data) return;
+
+            const [action, botId] = data.split(':');
+
+            // Answer callback query immediately
+            await ctx.answerCallbackQuery();
+
+            switch (action) {
+                case 'start':
+                    await this.handleStartBot(ctx, botId);
+                    break;
+                case 'stop':
+                    await this.handleStopBot(ctx, botId);
+                    break;
+                case 'restart':
+                    await this.handleRestartBot(ctx, botId);
+                    break;
+                case 'logs':
+                    await this.handleLogsForBot(ctx, botId, 50);
+                    break;
+            }
+        } catch (error) {
+            console.error('Callback error:', error);
+            await ctx.answerCallbackQuery({ text: '❌ Error occurred' });
+        }
+    }
+
+    private async handleStartBot(ctx: Context, botId: string): Promise<void> {
+        try {
+            const status = this.processManager.getBotStatus(botId);
+
+            if (!status) {
+                await ctx.reply(`❌ Bot \`${botId}\` not found.`, { parse_mode: 'Markdown' });
+                return;
+            }
+
+            if (status.status === 'running') {
+                await ctx.reply(`⚠️ Bot \`${botId}\` is already running.`, { parse_mode: 'Markdown' });
+                return;
+            }
+
+            await ctx.reply(`⏳ Starting bot \`${botId}\`...`, { parse_mode: 'Markdown' });
+
+            const tokens = await this.configManager.getBotTokens();
+            const botIndex = parseInt(botId.replace('bot-', ''), 10) - 1;
+
+            if (botIndex < 0 || botIndex >= tokens.length) {
+                await ctx.reply(`❌ Invalid bot index for \`${botId}\`.`, { parse_mode: 'Markdown' });
+                return;
+            }
+
+            await this.processManager.startBot(botId, tokens[botIndex]);
+            await ctx.reply(`✅ Bot \`${botId}\` started successfully!`, { parse_mode: 'Markdown' });
+
+            // Send updated status
+            setTimeout(async () => {
+                const updatedStatus = this.processManager.getBotStatus(botId);
+                if (updatedStatus) {
+                    await this.sendBotStatus(ctx, updatedStatus);
+                }
+            }, 1000);
+        } catch (error) {
+            await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    private async handleStopBot(ctx: Context, botId: string): Promise<void> {
+        try {
+            if (!this.processManager.isBotRunning(botId)) {
+                await ctx.reply(`⚠️ Bot \`${botId}\` is not running.`, { parse_mode: 'Markdown' });
+                return;
+            }
+
+            await ctx.reply(`⏳ Stopping bot \`${botId}\`...`, { parse_mode: 'Markdown' });
+            await this.processManager.stopBot(botId);
+            await ctx.reply(`✅ Bot \`${botId}\` stopped successfully!`, { parse_mode: 'Markdown' });
+
+            // Send updated status
+            const updatedStatus = this.processManager.getBotStatus(botId);
+            if (updatedStatus) {
+                await this.sendBotStatus(ctx, updatedStatus);
+            }
+        } catch (error) {
+            await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    private async handleRestartBot(ctx: Context, botId: string): Promise<void> {
+        try {
+            await ctx.reply(`⏳ Restarting bot \`${botId}\`...`, { parse_mode: 'Markdown' });
+
+            await this.processManager.restartBot(botId);
+            await ctx.reply(`✅ Bot \`${botId}\` restarted successfully!`, { parse_mode: 'Markdown' });
+
+            // Send updated status
+            setTimeout(async () => {
+                const updatedStatus = this.processManager.getBotStatus(botId);
+                if (updatedStatus) {
+                    await this.sendBotStatus(ctx, updatedStatus);
+                }
+            }, 1000);
+        } catch (error) {
+            await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    private async handleLogsForBot(ctx: Context, botId: string, lines: number): Promise<void> {
+        const logs = this.processManager.getBotLogs(botId, lines);
+
+        if (logs.length === 0) {
+            await ctx.reply(`📋 No logs available for \`${botId}\`.`, { parse_mode: 'Markdown' });
+            return;
+        }
+
+        const logsText = logs.join('\n');
+        const maxLength = 4000;
+
+        if (logsText.length > maxLength) {
+            const truncated = logsText.substring(logsText.length - maxLength);
+            await ctx.reply(`📋 *Logs for ${botId}* (truncated):\n\`\`\`\n${truncated}\n\`\`\``, { parse_mode: 'Markdown' });
+        } else {
+            await ctx.reply(`📋 *Logs for ${botId}:*\n\`\`\`\n${logsText}\n\`\`\``, { parse_mode: 'Markdown' });
+        }
     }
 
     private getStatusIcon(status: string): string {

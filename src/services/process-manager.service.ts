@@ -12,6 +12,8 @@ export interface BotProcessInfo {
     uptime: number;
     lastError: string | null;
     logs: string[];
+    fullName?: string;
+    username?: string;
 }
 
 export class ProcessManager {
@@ -250,6 +252,15 @@ export class ProcessManager {
                 break;
             case IPCMessageType.STATUS_UPDATE:
                 this.addLog(botId, `[STATUS] ${JSON.stringify(message.data)}`);
+                break;
+            case IPCMessageType.BOT_INFO:
+                if (message.data?.fullName) {
+                    info.fullName = message.data.fullName;
+                    this.addLog(botId, `[INFO] Bot name: ${message.data.fullName}`);
+                }
+                if (message.data?.username) {
+                    info.username = message.data.username;
+                }
                 break;
         }
     }
