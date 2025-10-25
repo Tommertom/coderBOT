@@ -2,6 +2,7 @@ import { Bot, Context, InputFile, InlineKeyboard } from 'grammy';
 import { XtermService } from './xterm.service.js';
 import { XtermRendererService } from './xterm-renderer.service.js';
 import { ConfigService } from '../../services/config.service.js';
+import { StartupPromptService } from '../../services/startup-prompt.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
 import { MessageUtils } from '../../utils/message.utils.js';
 import { ErrorUtils } from '../../utils/error.utils.js';
@@ -15,6 +16,7 @@ export class XtermBot {
     private xtermService: XtermService;
     private xtermRendererService: XtermRendererService;
     private configService: ConfigService;
+    private startupPromptService: StartupPromptService;
 
     private readonly CTRL_MAPPINGS: Record<string, string> = {
         '@': '\x00',
@@ -62,6 +64,7 @@ export class XtermBot {
         this.xtermService = xtermService;
         this.xtermRendererService = xtermRendererService;
         this.configService = configService;
+        this.startupPromptService = new StartupPromptService();
     }
 
     registerHandlers(bot: Bot): void {
@@ -70,7 +73,7 @@ export class XtermBot {
         bot.command('copilot', AccessControlMiddleware.requireAccess, this.handleCopilot.bind(this));
         bot.command('claude', AccessControlMiddleware.requireAccess, this.handleClaude.bind(this));
         bot.command('cursor', AccessControlMiddleware.requireAccess, this.handleCursor.bind(this));
-        bot.command('send', AccessControlMiddleware.requireAccess, this.handleSend.bind(this));
+        bot.command('startup', AccessControlMiddleware.requireAccess, this.handleStartup.bind(this));
         bot.command('keys', AccessControlMiddleware.requireAccess, this.handleKeys.bind(this));
         bot.command('tab', AccessControlMiddleware.requireAccess, this.handleTab.bind(this));
         bot.command('enter', AccessControlMiddleware.requireAccess, this.handleEnter.bind(this));
@@ -137,7 +140,7 @@ export class XtermBot {
             dimensions.cols
         );
 
-        const inlineKeyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
+        const inlineKeyboard = ScreenRefreshUtils.createScreenKeyboard();
 
         const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
             reply_markup: inlineKeyboard,
@@ -452,7 +455,7 @@ export class XtermBot {
                     console.error('Failed to delete status message:', error);
                 }
 
-                const keyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
+                const keyboard = ScreenRefreshUtils.createScreenKeyboard();
 
                 const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
                     reply_markup: keyboard,
@@ -494,40 +497,46 @@ export class XtermBot {
         });
     }
 
-    private async handleSend(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
 
-        await this.requireActiveSession(ctx, userId, async () => {
-            try {
-                const message = ctx.message?.text || '';
-                const text = message.replace('/send', '').trim();
 
-                if (!text) {
+    private async handleStartup(ctx: Context): Promise<void> {
+        try {
+            const message = ctx.message?.text || '';
+            const prompt = message.replace('/startup', '').trim();
+
+            if (!prompt) {
+                // Show current startup prompt or help message
+                const currentPrompt = this.startupPromptService.loadPrompt(this.botId);
+                if (currentPrompt) {
                     await ctx.reply(
-                        '⚠️ Please provide text to send.\n\n' +
-                        '*Usage:* `/send <text>`\n' +
-                        '*Example:* `/send ls -la`',
+                        `*Current startup prompt for bot ${this.botId}:*\n\n\`${currentPrompt}\`\n\n` +
+                        '*To update:* `/startup <your new prompt>`\n' +
+                        '*To delete:* Use the delete method in the service',
                         { parse_mode: 'Markdown' }
                     );
-                    return;
+                } else {
+                    await ctx.reply(
+                        '❌ No startup prompt configured.\n\n' +
+                        '*Usage:* `/startup <prompt>`\n' +
+                        '*Example:* `/startup ./cwd /home/user/project`\n\n' +
+                        'The startup prompt will be automatically sent when launching /copilot.',
+                        { parse_mode: 'Markdown' }
+                    );
                 }
-
-                this.xtermService.writeRawToSession(userId, text);
-
-                await new Promise(resolve => setTimeout(resolve, 50));
-
-                this.xtermService.writeRawToSession(userId, '\r');
-
-                const sentMsg = await ctx.reply(`✅ Sent - ${Messages.VIEW_SCREEN_HINT}`);
-
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-
-                this.triggerAutoRefresh(userId, chatId);
-            } catch (error) {
-                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
+                return;
             }
-        });
+
+            // Save the startup prompt
+            this.startupPromptService.savePrompt(this.botId, prompt);
+            await ctx.reply(
+                `✅ Startup prompt saved for bot ${this.botId}\n\n` +
+                `*Prompt:* \`${prompt}\`\n\n` +
+                'This message will be sent automatically when launching /copilot.',
+                { parse_mode: 'Markdown' }
+            );
+        } catch (error) {
+            await ctx.reply(ErrorUtils.createErrorMessage('save startup prompt', error));
+        }
     }
 
     /**
@@ -564,6 +573,25 @@ export class XtermBot {
 
             // Send initial screenshot
             await this.sendSessionScreenshot(ctx, userId);
+
+            // Load and send startup prompt after 3 seconds (only for copilot)
+            if (assistantType === 'copilot') {
+                setTimeout(async () => {
+                    try {
+                        const startupPrompt = this.startupPromptService.loadPrompt(this.botId);
+                        if (startupPrompt && startupPrompt.trim()) {
+                            // Send the startup prompt to the terminal
+                            this.xtermService.writeRawToSession(userId, startupPrompt);
+                            await new Promise(resolve => setTimeout(resolve, 50));
+                            this.xtermService.writeRawToSession(userId, '\r');
+                            console.log(`Sent startup prompt to copilot for bot ${this.botId}: ${startupPrompt}`);
+                            this.triggerAutoRefresh(userId, chatId);
+                        }
+                    } catch (error) {
+                        console.error(`Failed to send startup prompt for bot ${this.botId}:`, error);
+                    }
+                }, 3000);
+            }
         } catch (error) {
             await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.START_TERMINAL, error));
         }
@@ -610,7 +638,7 @@ export class XtermBot {
                     dimensions.cols
                 );
 
-                const keyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
+                const keyboard = ScreenRefreshUtils.createScreenKeyboard();
 
                 if (ctx.callbackQuery?.message) {
                     await ctx.editMessageMedia({
@@ -620,6 +648,23 @@ export class XtermBot {
                         reply_markup: keyboard,
                     });
                 }
+                
+                // Trigger auto-refresh interval
+                this.triggerAutoRefresh(userId, chatId);
+                return;
+            }
+
+            // Handle number key buttons (1, 2 and 3)
+            if (callbackData === 'num_1' || callbackData === 'num_2' || callbackData === 'num_3') {
+                if (!this.xtermService.hasSession(userId)) {
+                    await this.safeAnswerCallbackQuery(ctx, Messages.NO_ACTIVE_TERMINAL_SESSION);
+                    return;
+                }
+
+                const number = callbackData === 'num_1' ? '1' : callbackData === 'num_2' ? '2' : '3';
+                this.xtermService.writeRawToSession(userId, number);
+                await this.safeAnswerCallbackQuery(ctx, SuccessMessages.SENT(number));
+                this.triggerAutoRefresh(userId, chatId);
                 return;
             }
 

@@ -186,8 +186,41 @@ npm install -g @tommertom/coderbot
 coderbot
 ```
 
-**Method 3: Docker (Isolated Environment)**
-(to document later)
+**Method 3: Docker (Automated Script - Isolated Environment)**
+
+Use the automated Docker deployment script for a fully isolated, production-ready environment:
+
+```bash
+# Run the automated Docker setup script
+./scripts/run-coderbot-docker.sh <BOT_TOKEN> <USER_ID> <GITHUB_PAT>
+
+# Example:
+./scripts/run-coderbot-docker.sh \
+  "123456789:ABCdef..." \
+  "987654321" \
+  "ghp_xxxxx..."
+```
+
+This script automatically:
+- Creates a minimal Docker container with all dependencies
+- Installs and configures GitHub CLI and Copilot CLI
+- Sets up the bot with your credentials
+- Provides easy management with docker-compose
+
+**See [Docker Runner Documentation](docs/docker-runner-script.md) for detailed instructions.**
+
+**Method 4: Docker (Manual - Using Existing Dockerfile)**
+
+```bash
+# Build the image
+docker build -t coderbot .
+
+# Run with your .env file
+docker run -d --name coderbot \
+  --env-file .env \
+  -v $(pwd)/logs:/app/logs \
+  coderbot
+```
 
 ### Configuration
 

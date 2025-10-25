@@ -60,7 +60,6 @@ export class CoderBot {
         bot.command('help', AccessControlMiddleware.requireAccess, this.handleHelp.bind(this));
         bot.command('esc', AccessControlMiddleware.requireAccess, this.handleEsc.bind(this));
         bot.command('close', AccessControlMiddleware.requireAccess, this.handleClose.bind(this));
-        bot.command('send', AccessControlMiddleware.requireAccess, this.handleSend.bind(this));
         bot.command('killbot', AccessControlMiddleware.requireAccess, this.handleKillbot.bind(this));
         bot.command('urls', AccessControlMiddleware.requireAccess, this.handleUrls.bind(this));
         bot.on('callback_query:data', AccessControlMiddleware.requireAccess, this.handleCallbackQuery.bind(this));
@@ -83,13 +82,29 @@ export class CoderBot {
                 dimensions.cols
             );
 
-            const keyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
+            const keyboard = ScreenRefreshUtils.createScreenKeyboard();
 
             await this.bot!.api.sendPhoto(chatId, new InputFile(imageBuffer), {
                 reply_markup: keyboard,
             });
         } catch (error) {
             console.error('Failed to refresh screen:', error);
+        }
+    }
+
+    /**
+     * Helper method to trigger auto-refresh after sending input to terminal
+     */
+    private triggerAutoRefresh(userId: string, chatId: number): void {
+        if (this.bot) {
+            ScreenRefreshUtils.startAutoRefresh(
+                userId,
+                chatId,
+                this.bot,
+                this.xtermService,
+                this.xtermRendererService,
+                this.configService
+            );
         }
     }
 
@@ -113,7 +128,7 @@ export class CoderBot {
                     dimensions.cols
                 );
 
-                const keyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
+                const keyboard = ScreenRefreshUtils.createScreenKeyboard();
 
                 try {
                     await this.bot.api.editMessageMedia(chatId, lastMessageId, {
@@ -199,7 +214,7 @@ export class CoderBot {
                     dimensions.cols
                 );
 
-                const keyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
+                const keyboard = ScreenRefreshUtils.createScreenKeyboard();
 
                 if (ctx.callbackQuery?.message) {
                     await ctx.editMessageMedia({
@@ -209,6 +224,23 @@ export class CoderBot {
                         reply_markup: keyboard,
                     });
                 }
+                
+                // Trigger auto-refresh interval
+                this.triggerAutoRefresh(userId, chatId);
+                return;
+            }
+
+            // Handle number key buttons (1, 2 and 3)
+            if (callbackData === 'num_1' || callbackData === 'num_2' || callbackData === 'num_3') {
+                if (!this.xtermService.hasSession(userId)) {
+                    await this.safeAnswerCallbackQuery(ctx, Messages.NO_ACTIVE_TERMINAL_SESSION);
+                    return;
+                }
+
+                const number = callbackData === 'num_1' ? '1' : callbackData === 'num_2' ? '2' : '3';
+                this.xtermService.writeRawToSession(userId, number);
+                await this.safeAnswerCallbackQuery(ctx, SuccessMessages.SENT(number));
+                this.triggerAutoRefresh(userId, chatId);
                 return;
             }
 
@@ -369,7 +401,7 @@ export class CoderBot {
             dimensions.cols
         );
 
-        const inlineKeyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
+        const inlineKeyboard = ScreenRefreshUtils.createScreenKeyboard();
 
         const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
             reply_markup: inlineKeyboard,
@@ -426,56 +458,7 @@ export class CoderBot {
         await this.handleAIAssistant(ctx, 'cursor');
     }
 
-    private async handleSend(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
 
-        try {
-            if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply(Messages.NO_ACTIVE_SESSION);
-                return;
-            }
-
-            const message = ctx.message?.text || '';
-            const text = message.replace('/send', '').trim();
-
-            if (!text) {
-                await ctx.reply(
-                    '⚠️ Please provide text to send.\n\n' +
-                    '*Usage:* `/send <text>`\n' +
-                    '*Example:* `/send ls -la`',
-                    { parse_mode: 'Markdown' }
-                );
-                return;
-            }
-
-            const processedText = this.coderService.replaceMediaPlaceholder(text);
-
-            this.xtermService.writeRawToSession(userId, processedText);
-
-            await new Promise(resolve => setTimeout(resolve, 50));
-
-            this.xtermService.writeRawToSession(userId, '\r');
-
-            const sentMsg = await ctx.reply(`✅ Sent - ${Messages.VIEW_SCREEN_HINT}`);
-
-            await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-
-            // Start auto-refresh if last screen exists
-            if (this.bot) {
-                ScreenRefreshUtils.startAutoRefresh(
-                    userId,
-                    chatId,
-                    this.bot,
-                    this.xtermService,
-                    this.xtermRendererService,
-                    this.configService
-                );
-            }
-        } catch (error) {
-            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
-        }
-    }
 
     private async handleEsc(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
@@ -559,7 +542,6 @@ export class CoderBot {
             '*Sending Text to Terminal:*\n' +
             'Type any message (not starting with /) - Sent directly to terminal with Enter\n' +
             '.command - Send command (dot prefix removed, Enter added automatically)\n' +
-            '/send <text> - Send text to terminal with Enter\n' +
             '*Tip:* Use \\[media\\] in your text - it will be replaced with the media directory path\n\n' +
             '*Special Keys:*\n' +
             '/esc - Send Escape key\n\n' +

@@ -5,6 +5,18 @@ import { ConfigService } from '../services/config.service.js';
 
 export class ScreenRefreshUtils {
     /**
+     * Create a standard inline keyboard for screen display.
+     * Layout: Refresh button on top, then number buttons below.
+     */
+    static createScreenKeyboard(): InlineKeyboard {
+        return new InlineKeyboard()
+            .text('🔄 Refresh', 'refresh_screen')
+            .row()
+            .text('1', 'num_1')
+            .text('2', 'num_2')
+            .text('3', 'num_3');
+    }
+    /**
      * Start automatic screen refreshes for a user session.
      * Refreshes the last shown screen at configured intervals for a configured number of times.
      * If already running, does not start a new parallel process.
@@ -70,7 +82,7 @@ export class ScreenRefreshUtils {
                     dimensions.cols
                 );
 
-                const keyboard = new InlineKeyboard().text('🔄 Refresh', 'refresh_screen');
+                const keyboard = ScreenRefreshUtils.createScreenKeyboard();
 
                 await bot.api.editMessageMedia(chatId, lastMessageId, {
                     type: 'photo',
