@@ -41,8 +41,8 @@ The `run-coderbot-docker.sh` script provides a fully automated way to deploy cod
 
 | Argument | Description | Example |
 |----------|-------------|---------|
-| `BOT_TOKEN` | Telegram bot token from @BotFather | `123456789:ABCdefGHIjkl...` |
-| `USER_ID` | Your Telegram user ID for access control | `987654321` |
+| `BOT_TOKEN` | Telegram bot token(s) from @BotFather - comma-separated for multiple | `123456789:ABCdefGHIjkl...` or `123:ABC...,456:DEF...` |
+| `USER_ID` | Your Telegram user ID(s) for access control - comma-separated for multiple | `987654321` or `111,222,333` |
 | `GITHUB_PAT` | GitHub Personal Access Token | `ghp_xxxxxxxxxxxx...` |
 
 ### Example
@@ -59,7 +59,8 @@ The `run-coderbot-docker.sh` script provides a fully automated way to deploy cod
 The script performs the following steps:
 
 1. **Creates Working Directory**
-   - Generates unique directory in `/tmp/coderbot-docker-<pid>`
+   - Generates unique directory in `users/coderbot-instance-<pid>`
+   - Located in the project root for persistence
    - Changes to this directory for all operations
 
 2. **Generates `.env` File**
@@ -94,7 +95,7 @@ The script performs the following steps:
 After running, the working directory contains:
 
 ```
-/tmp/coderbot-docker-<pid>/
+users/coderbot-instance-<pid>/
 ├── .env                   # Bot configuration (SENSITIVE!)
 ├── Dockerfile             # Custom minimal Docker image
 ├── docker-compose.yml     # Docker Compose configuration
@@ -108,7 +109,7 @@ After running, the working directory contains:
 ### Start the Container
 
 ```bash
-cd /tmp/coderbot-docker-<pid>
+cd users/coderbot-instance-<pid>
 ./run-docker.sh
 ```
 
@@ -247,7 +248,9 @@ sudo usermod -aG docker $USER
 After running the script, you can edit the `.env` file to customize:
 
 ```bash
-cd /tmp/coderbot-docker-<pid>
+### Edit Configuration
+```bash
+cd users/coderbot-instance-<pid>
 nano .env
 docker-compose restart
 ```
@@ -288,10 +291,10 @@ WORK_DIR="/home/user/coderbot-instances/instance-$$"
 ### Remove a Single Instance
 
 ```bash
-cd /tmp/coderbot-docker-<pid>
+cd users/coderbot-instance-<pid>
 docker-compose down -v  # Remove containers and volumes
-cd ..
-rm -rf /tmp/coderbot-docker-<pid>
+cd ../..
+rm -rf users/coderbot-instance-<pid>
 ```
 
 ### Remove All CoderBOT Containers

@@ -13,12 +13,15 @@
 #   ./run-coderbot-docker.sh <BOT_TOKEN> <USER_ID> <GITHUB_PAT>
 #
 # Arguments:
-#   BOT_TOKEN    - Telegram bot token from @BotFather
-#   USER_ID      - Telegram user ID for access control
+#   BOT_TOKEN    - Telegram bot token(s) from @BotFather (comma-separated for multiple)
+#   USER_ID      - Telegram user ID(s) for access control (comma-separated for multiple)
 #   GITHUB_PAT   - GitHub Personal Access Token for Copilot CLI authentication
 #
-# Example:
-#   ./run-coderbot-docker.sh "123456:ABC-DEF..." "987654321" "ghp_xxxxx..."
+# Examples:
+#   Single bot, single user:
+#     ./run-coderbot-docker.sh "123456:ABC-DEF..." "987654321" "ghp_xxxxx..."
+#   Multiple bots, multiple users:
+#     ./run-coderbot-docker.sh "123:ABC...,456:DEF..." "111,222,333" "ghp_xxxxx..."
 #
 ###############################################################################
 
@@ -55,12 +58,13 @@ if [ "$#" -ne 3 ]; then
     echo "Usage: $0 <BOT_TOKEN> <USER_ID> <GITHUB_PAT>"
     echo ""
     echo "Arguments:"
-    echo "  BOT_TOKEN    - Telegram bot token from @BotFather"
-    echo "  USER_ID      - Telegram user ID for access control"
+    echo "  BOT_TOKEN    - Telegram bot token(s) from @BotFather (comma-separated)"
+    echo "  USER_ID      - Telegram user ID(s) for access control (comma-separated)"
     echo "  GITHUB_PAT   - GitHub Personal Access Token for Copilot CLI"
     echo ""
-    echo "Example:"
-    echo "  $0 \"123456:ABC-DEF...\" \"987654321\" \"ghp_xxxxx...\""
+    echo "Examples:"
+    echo "  Single: $0 \"123456:ABC-DEF...\" \"987654321\" \"ghp_xxxxx...\""
+    echo "  Multi:  $0 \"123:ABC...,456:DEF...\" \"111,222,333\" \"ghp_xxxxx...\""
     exit 1
 fi
 
@@ -69,8 +73,14 @@ BOT_TOKEN="$1"
 USER_ID="$2"
 GITHUB_PAT="$3"
 
-# Set working directory to /tmp
-WORK_DIR="/tmp/coderbot-docker-$$"
+# Get the script's directory to find the project root
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+
+# Set working directory to users/ folder in project root
+USERS_DIR="$PROJECT_ROOT/users"
+mkdir -p "$USERS_DIR"
+WORK_DIR="$USERS_DIR/coderbot-instance-$$"
 print_info "Creating working directory: $WORK_DIR"
 mkdir -p "$WORK_DIR"
 cd "$WORK_DIR"
@@ -192,16 +202,16 @@ set -e\n\
 # Authenticate with GitHub using PAT\n\
 echo "$GITHUB_PAT" | gh auth login --with-token\n\
 \n\
-# Install GitHub Copilot CLI extension\n\
-echo "Installing GitHub Copilot CLI extension..."\n\
-gh extension install github/gh-copilot || echo "Copilot extension may already be installed"\n\
+# Install GitHub Copilot CLI via npm\n\
+echo "Installing GitHub Copilot CLI..."\n\
+npm install -g @github/copilot@latest\n\
 \n\
 # Verify installation\n\
-echo "GitHub CLI version:"\n\
+echo "GitHub CLI version:\"\n\
 gh --version\n\
 \n\
-echo "GitHub Copilot CLI installed:"\n\
-gh extension list | grep copilot || echo "Copilot not found in extensions"\n\
+echo "GitHub Copilot CLI installed:\"\n\
+npm list -g @github/copilot || echo "Checking Copilot installation..."\n\
 \n\
 # Run coderBOT using npx\n\
 echo "Starting coderBOT..."\n\

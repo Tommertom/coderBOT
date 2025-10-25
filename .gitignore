@@ -79,4 +79,7 @@ secrets/
 # Startup prompts
 startip/
 
+# Docker runner user instances
+users/
+
 core

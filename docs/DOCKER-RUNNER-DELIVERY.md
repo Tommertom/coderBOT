@@ -69,7 +69,11 @@ Your request was to create a bash script that:
 
 ### Quick Start
 ```bash
-./scripts/run-coderbot-docker.sh <BOT_TOKEN> <USER_ID> <GITHUB_PAT>
+| Argument | Description | Example |
+|----------|-------------|---------||
+| `BOT_TOKEN` | Telegram bot token(s) from @BotFather - comma-separated | `123456789:ABCdefGHIjkl...` or `123:ABC...,456:DEF...` |
+| `USER_ID` | Your Telegram user ID(s) for access control - comma-separated | `987654321` or `111,222,333` |
+| `GITHUB_PAT` | GitHub Personal Access Token | `ghp_xxxxxxxxxxxx...` |
 ```
 
 ### Example
@@ -81,7 +85,7 @@ Your request was to create a bash script that:
 ```
 
 ### What Happens
-1. Creates `/tmp/coderbot-docker-<pid>/`
+1. Creates `users/coderbot-instance-<pid>/`
 2. Generates `.env` with your credentials
 3. Creates minimal Dockerfile (node:20-slim)
 4. Creates docker-compose.yml

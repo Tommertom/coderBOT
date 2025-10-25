@@ -22,10 +22,19 @@
 
 ### 2. Run the Script (1 command)
 
+**Single bot and user:**
 ```bash
 ./scripts/run-coderbot-docker.sh \
   "YOUR_BOT_TOKEN" \
   "YOUR_USER_ID" \
+  "YOUR_GITHUB_PAT"
+```
+
+**Multiple bots and/or users:**
+```bash
+./scripts/run-coderbot-docker.sh \
+  "BOT_TOKEN_1,BOT_TOKEN_2" \
+  "USER_ID_1,USER_ID_2,USER_ID_3" \
   "YOUR_GITHUB_PAT"
 ```
 
@@ -90,7 +99,7 @@ docker info
 
 **Bot not responding**:
 ```bash
-cd /tmp/coderbot-docker-*
+cd users/coderbot-instance-*
 docker-compose logs -f
 # Check for errors
 ```

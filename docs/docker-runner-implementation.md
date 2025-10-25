@@ -4,19 +4,13 @@
 
 A fully automated bash script that deploys coderBOT in a minimal Docker container with GitHub CLI and GitHub Copilot CLI pre-configured.
 
-## What Was Created
-
-### Main Script
-- **File**: `/home/tom/coderBOT/scripts/run-coderbot-docker.sh`
-- **Purpose**: Automated Docker deployment script
-- **Size**: ~300 lines
-- **Executable**: Yes (`chmod +x`)
-
-### Documentation
-1. **Complete Guide**: `docs/docker-runner-script.md` - Full documentation
-2. **Quick Reference**: `docs/docker-runner-quick-reference.md` - Cheat sheet
-3. **Testing Guide**: `docs/docker-runner-testing-guide.md` - Test procedures
-4. **This Summary**: `docs/docker-runner-implementation.md`
+**What you have**:
+- Fully functional automated deployment script
+- Comprehensive documentation (100+ pages)
+- Example usage templates
+- Complete testing guide
+- Production-ready implementation
+- Persistent users/ folder for instances (gitignored)
 
 ### Helper Files
 - **Example**: `scripts/example-usage.sh` - Usage template
@@ -64,8 +58,8 @@ A fully automated bash script that deploys coderBOT in a minimal Docker containe
 
 | Argument | Description | Example |
 |----------|-------------|---------|
-| `BOT_TOKEN` | Telegram bot token | `123456789:ABCdef...` |
-| `USER_ID` | Telegram user ID | `987654321` |
+| `BOT_TOKEN` | Telegram bot token(s) - comma-separated | `123456789:ABCdef...` or `123:ABC...,456:DEF...` |
+| `USER_ID` | Telegram user ID(s) - comma-separated | `987654321` or `111,222,333` |
 | `GITHUB_PAT` | GitHub Personal Access Token | `ghp_xxxxx...` |
 
 ### Example
@@ -85,7 +79,7 @@ User runs script with arguments
     ↓
 Script validates arguments
     ↓
-Creates working directory in /tmp
+Creates working directory in users/ folder
     ↓
 Changes to working directory
 ```
@@ -135,7 +129,7 @@ Bot is ready
 
 ### Working Directory Structure
 ```
-/tmp/coderbot-docker-<pid>/
+users/coderbot-instance-<pid>/
 ├── .env                   # Bot configuration (SENSITIVE!)
 ├── Dockerfile             # Minimal Docker image definition
 ├── docker-compose.yml     # Docker Compose configuration
@@ -435,6 +429,9 @@ docker-compose up -d
 
 ### Monitoring
 ```bash
+# Navigate to instance directory
+cd users/coderbot-instance-<pid>
+
 # Check container health
 docker-compose ps
 

@@ -51,7 +51,7 @@ chmod +x /home/tom/coderBOT/scripts/run-coderbot-docker.sh
 ```
 
 **Expected Results:**
-- ✅ Script creates directory in `/tmp/coderbot-docker-<pid>`
+- ✅ Script creates directory in `users/coderbot-instance-<pid>`
 - ✅ Creates all necessary files (.env, Dockerfile, docker-compose.yml, etc.)
 - ✅ Prompts whether to build and start container
 - ✅ No syntax or runtime errors
@@ -60,7 +60,7 @@ chmod +x /home/tom/coderBOT/scripts/run-coderbot-docker.sh
 
 ```bash
 # Navigate to created directory
-cd /tmp/coderbot-docker-*
+cd users/coderbot-instance-*
 
 # Check all files exist
 ls -la
@@ -129,11 +129,11 @@ gh --version
 # Check authentication
 gh auth status
 
-# Check Copilot extension
-gh extension list | grep copilot
+# Check Copilot installation (npm)
+npm list -g @github/copilot
 
 # Test Copilot (may take a moment)
-gh copilot suggest "how to list files in linux"
+github-copilot-cli
 
 # Exit container
 exit
@@ -202,11 +202,11 @@ docker-compose down -v
 docker-compose ps
 
 # Remove working directory
-cd /tmp
-rm -rf coderbot-docker-*
+cd ../..
+rm -rf users/coderbot-instance-*
 
 # Verify cleanup
-ls -la /tmp | grep coderbot
+ls -la users/ 2>/dev/null | grep coderbot || echo "All cleaned up"
 ```
 
 **Expected Results:**
@@ -236,7 +236,7 @@ echo "Test 1: Running script..."
 echo "n" | ./scripts/run-coderbot-docker.sh "$TEST_BOT_TOKEN" "$TEST_USER_ID" "$TEST_GITHUB_PAT"
 
 # Find created directory
-WORK_DIR=$(ls -td /tmp/coderbot-docker-* | head -1)
+WORK_DIR=$(ls -td users/coderbot-instance-* | head -1)
 cd "$WORK_DIR"
 
 # Test 2: Verify files
@@ -373,12 +373,12 @@ docker rm $(docker ps -a -q --filter "name=coderbot")
 docker rmi $(docker images -q --filter "reference=*coderbot*")
 
 # Clean working directories
-rm -rf /tmp/coderbot-docker-*
+rm -rf users/coderbot-instance-*
 
 # Verify cleanup
 docker ps -a | grep coderbot
 docker images | grep coderbot
-ls /tmp | grep coderbot
+ls users/ 2>/dev/null | grep coderbot || echo "Instances cleaned"
 ```
 
 ## Test Checklist

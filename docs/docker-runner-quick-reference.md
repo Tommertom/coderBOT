@@ -10,12 +10,13 @@
 
 | # | Name | Description | Where to Get It |
 |---|------|-------------|-----------------|
-| 1 | `BOT_TOKEN` | Telegram bot token | [@BotFather](https://t.me/BotFather) on Telegram |
-| 2 | `USER_ID` | Your Telegram user ID | Message any bot, it shows in error |
+| 1 | `BOT_TOKEN` | Telegram bot token(s) - comma-separated | [@BotFather](https://t.me/BotFather) on Telegram |
+| 2 | `USER_ID` | Your Telegram user ID(s) - comma-separated | Message any bot, it shows in error |
 | 3 | `GITHUB_PAT` | GitHub Personal Access Token | [GitHub Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens) |
 
 ## Complete Example
 
+**Single bot, single user:**
 ```bash
 ./scripts/run-coderbot-docker.sh \
   "123456789:ABCdefGHIjklMNOpqrsTUVwxyz" \
@@ -23,12 +24,20 @@
   "ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456"
 ```
 
+**Multiple bots, multiple users:**
+```bash
+./scripts/run-coderbot-docker.sh \
+  "123456789:ABCdef...,987654321:XYZabc..." \
+  "111111111,222222222,333333333" \
+  "ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456"
+```
+
 ## After Running
 
-The script creates a working directory: `/tmp/coderbot-docker-<pid>`
+The script creates a working directory: `users/coderbot-instance-<pid>`
 
 ```bash
-cd /tmp/coderbot-docker-<pid>
+cd users/coderbot-instance-<pid>
 
 # View logs
 docker-compose logs -f
@@ -70,8 +79,8 @@ docker-compose restart
 ### Complete Cleanup
 ```bash
 docker-compose down -v
-cd ..
-rm -rf /tmp/coderbot-docker-*
+cd ../..
+rm -rf users/coderbot-instance-*
 ```
 
 ## Troubleshooting
