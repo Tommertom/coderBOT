@@ -1,23 +1,18 @@
-# Use Node.js LTS with a full OS for terminal functionality
-FROM node:20-bookworm
+# Minimal Linux setup with Node.js, GitHub CLI, and GitHub Copilot CLI
+FROM node:22-slim
 
-# Install essential tools for a functional bash environment
+# Install essential packages including build tools for node-pty
 RUN apt-get update && apt-get install -y \
     bash \
     curl \
     wget \
     git \
-    vim \
-    nano \
-    less \
-    sudo \
-    build-essential \
-    python3 \
-    python3-pip \
     gpg \
     software-properties-common \
-    # Puppeteer dependencies for screenshots
     ca-certificates \
+    make \
+    python3 \
+    build-essential \
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \
@@ -54,30 +49,41 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Install GitHub CLI (required for Copilot CLI)
-RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
-    apt-get update && \
-    apt-get install -y gh && \
-    rm -rf /var/lib/apt/lists/*
+# Install GitHub CLI
+RUN (type -p wget >/dev/null || (apt update && apt install wget -y)) \
+    && mkdir -p -m 755 /etc/apt/keyrings \
+    && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    && cat $out | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+    && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && mkdir -p -m 755 /etc/apt/sources.list.d \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt update \
+    && apt install gh -y \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install GitHub Copilot CLI extension
-# Note: This requires authentication which must be done at runtime
-# Users need to run: gh auth login && gh extension install github/gh-copilot
-RUN mkdir -p /usr/local/share/gh-copilot-setup && \
-    echo '#!/bin/bash\necho "To setup GitHub Copilot CLI, run:"\necho "  gh auth login"\necho "  gh extension install github/gh-copilot"\necho "Then you can use: gh copilot suggest or gh copilot explain"' > /usr/local/bin/setup-copilot && \
-    chmod +x /usr/local/bin/setup-copilot
+RUN npm install -g @github/copilot@latest
+RUN npm install -g npm@latest
 
-# Install Claude CLI (community version via npm)
-# Note: Official Claude CLI doesn't exist, but we can use mcp-cli or claude-cli npm packages
-RUN npm install -g @modelcontextprotocol/cli || echo "MCP CLI not available, skipping"
+# Create working directory
+WORKDIR /app
 
-# Note about Cursor CLI:
-# Cursor CLI is part of the Cursor editor and requires the full editor installation
-# It's not available as a standalone package. Users can:
-# 1. Install Cursor editor manually in the container, or
-# 2. Use VSCode with Continue.dev extension as an alternative
-# 3. Use the Cursor API directly if available
+# Copy .env file (if building with local context)
+# COPY .env /app/.env
+
+# Create startup script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+# Update Copilot CLI\n\
+npm install -g @github/copilot@latest\n\
+\n\
+# Run coderBOT using npx -y latest\n\
+echo "Starting coderBOT..."\n\
+npx -y @tommertom/coderbot@latest\n\
+' > /app/start.sh && chmod +x /app/start.sh
+
+# Run the startup script
+CMD ["/app/start.sh"]
 
 # Create info script for CLI tools
 RUN echo '#!/bin/bash\n\

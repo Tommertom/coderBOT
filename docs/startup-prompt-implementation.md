@@ -126,5 +126,5 @@ These were not requested but could be added in the future:
 - Add `/clearstartup` command to delete a bot's startup prompt
 - Add `/viewstartup` command to see current startup prompt
 - Support for multiple startup prompts per bot
-- Support for startup prompts with `/claude` and `/cursor`
+- Support for startup prompts with `/claude` and `/gemini`
 - Add startup prompt templates

@@ -21,7 +21,7 @@ if (process.platform === 'win32') {
     console.log('⚠️  Windows is not supported for direct installation.');
     console.log('   CoderBOT uses node-pty which requires native compilation.');
     console.log('\n   📦 Please use Docker instead:');
-    console.log('   See https://github.com/Tommertom/coderBOT/blob/main/DOCKER_GUIDE.md\n');
+    console.log('   See https://github.com/Tommertom/shippi-coderBOT/blob/main/DOCKER_GUIDE.md\n');
 }
 
 // Check if .env file exists in current directory

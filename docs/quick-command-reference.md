@@ -22,9 +22,10 @@
 | Command | Description |
 |---------|-------------|
 | `/xterm` | Start raw bash terminal |
-| `/copilot` | Start GitHub Copilot AI session |
+| `/copilot` | Start GitHub Copilot CLI session |
 | `/claude` | Start Claude AI session |
-| `/cursor` | Start Cursor AI session |
+| `/gemini` | Start Google Gemini session |
+| `/gemini` | Start Gemini AI session |
 
 ### Text Input
 | Command | Description |

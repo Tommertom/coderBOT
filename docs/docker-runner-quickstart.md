@@ -54,10 +54,10 @@ Your bot is now running in Docker with GitHub Copilot CLI ready to use.
 ## What Just Happened?
 
 - ✅ Created isolated Docker environment
-- ✅ Installed GitHub CLI and Copilot
+- ✅ Installed GitHub CLI, Copilot CLI, and other AI tools
 - ✅ Configured your bot
 - ✅ Started the container
-- ✅ Bot is ready on Telegram
+- ✅ Bot is ready on Telegram with support for Copilot, Claude, Gemini, and more
 
 ## Common Commands
 

@@ -159,7 +159,13 @@ The docker-compose.yml uses `npx @tommertom/coderbot` to run the latest publishe
 - ✅ Always get the latest version on restart
 - ✅ Minimal setup
 - ✅ Automatic dependency installation
-- ✅ Pre-installs GitHub Copilot and Claude AI CLIs
+- ✅ Pre-installs GitHub Copilot CLI, Claude AI, and other AI tools
+
+**Supported AI Assistants:**
+- GitHub Copilot CLI (via `@github/copilot`)
+- Claude AI (via `@anthropic-ai/claude-code`)
+- Google Gemini (configure API key)
+- Cursor and other CLI-based AI tools
 
 ## Configuration
 
@@ -203,6 +209,8 @@ The docker-compose.yml automatically installs:
 - `@github/copilot` - GitHub Copilot CLI
 - `@anthropic-ai/claude-code` - Claude AI CLI
 
+For Google Gemini and other AI tools, you'll need to install them manually or add them to the Docker setup.
+
 ### Authenticating AI Tools
 
 You need to authenticate these tools **inside the running container**:
@@ -212,6 +220,8 @@ You need to authenticate these tools **inside the running container**:
 docker exec -it coderbot bash
 
 # Authenticate GitHub Copilot
+gh copilot auth
+# Or if using older version:
 github-copilot-cli auth
 
 # Authenticate GitHub CLI (required for Copilot)
@@ -219,6 +229,10 @@ gh auth login
 
 # Authenticate Claude (if using)
 claude auth
+
+# For Google Gemini, set your API key:
+export GOOGLE_AI_API_KEY=your_api_key_here
+# Or configure according to Gemini CLI documentation
 
 # Exit the container
 exit
@@ -284,13 +298,19 @@ docker-compose logs coderbot
 ```bash
 docker exec -it coderbot bash
 gh auth status
-github-copilot-cli --version
+gh copilot --version
 ```
 
 **Claude:**
 ```bash
 docker exec -it coderbot bash
 claude --version
+```
+
+**Google Gemini:**
+```bash
+docker exec -it coderbot bash
+# Check your Gemini installation and API key configuration
 ```
 
 Re-authenticate if needed.
@@ -423,6 +443,6 @@ XTERM_SHELL_PATH=/bin/zsh
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/Tommertom/coderBOT/issues)
+- **Issues**: [GitHub Issues](https://github.com/Tommertom/shippi-coderBOT/issues)
 - **Main README**: [README.md](README.md)
 - **NPM Package**: [@tommertom/coderbot](https://www.npmjs.com/package/@tommertom/coderbot)

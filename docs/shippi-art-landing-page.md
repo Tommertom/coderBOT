@@ -8,7 +8,7 @@
 **Ship Code. Anywhere. Instantly.**
 
 ### Subheadline
-Your AI-powered terminal in your pocket. Code, build, and deploy from your phone with GitHub Copilot, Claude, and your favorite dev tools.
+Your AI-powered terminal in your pocket. Code, build, and deploy from your phone with GitHub Copilot CLI, Claude AI, Google Gemini, and your favorite dev tools.
 
 ### Call to Action
 **Join the Waitlist**  
@@ -37,11 +37,11 @@ Modern developers face a productivity paradox:
 
 **shippi.art transforms Telegram into your personal AI-powered development terminal.**
 
-Get instant access to your complete dev environment - GitHub Copilot, Claude CLI, any command-line tool - directly from your phone, anywhere in the world.
+Get instant access to your complete dev environment - GitHub Copilot CLI, Claude AI, Google Gemini, any command-line tool - directly from your phone, anywhere in the world.
 
 #### How It Works
 1. 📱 **Message your bot** - Send commands via Telegram
-2. 🤖 **AI assists you** - GitHub Copilot & Claude at your fingertips  
+2. 🤖 **AI assists you** - GitHub Copilot CLI, Claude AI & Google Gemini at your fingertips  
 3. 🚀 **Ship instantly** - Deploy, debug, monitor - all from mobile
 4. 📸 **See everything** - Real-time terminal screenshots with full visual feedback
 
@@ -59,7 +59,8 @@ Get instant access to your complete dev environment - GitHub Copilot, Claude CLI
 
 **🤖 AI Assistance On-The-Go**
 - GitHub Copilot CLI at your fingertips
-- Claude CLI for complex problem-solving
+- Claude AI for complex problem-solving
+- Google Gemini for multimodal AI assistance
 - Full terminal access for any CLI tool
 - Smart, context-aware code suggestions
 

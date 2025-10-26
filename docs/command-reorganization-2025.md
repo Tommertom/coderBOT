@@ -11,7 +11,7 @@ Commands have been reorganized between the Coder Bot and Xterm Bot to better ali
 **Commands Removed:**
 - `/copilot` → Moved to Xterm Bot
 - `/claude` → Moved to Xterm Bot  
-- `/cursor` → Moved to Xterm Bot
+- `/gemini` → Moved to Xterm Bot
 
 **Commands Added:**
 - `/esc` ← Moved from Xterm Bot (placed after `/help`)
@@ -31,7 +31,7 @@ Commands have been reorganized between the Coder Bot and Xterm Bot to better ali
 **Commands Added:**
 - `/copilot` ← Moved from Coder Bot
 - `/claude` ← Moved from Coder Bot
-- `/cursor` ← Moved from Coder Bot
+- `/gemini` ← Moved from Coder Bot
 
 **Commands Removed:**
 - `/close` → Moved to Coder Bot
@@ -40,7 +40,7 @@ Commands have been reorganized between the Coder Bot and Xterm Bot to better ali
 1. `/xterm` - Start raw bash terminal
 2. `/copilot` - Start GitHub Copilot AI session
 3. `/claude` - Start Claude AI session
-4. `/cursor` - Start Cursor AI session
+4. `/gemini` - Start Cursor AI session
 5. `/send` - Send text with Enter
 6. `/keys` - Send text without Enter
 7. `/tab` - Send Tab character
@@ -70,7 +70,7 @@ Commands have been reorganized between the Coder Bot and Xterm Bot to better ali
 
 **Xterm Bot (Feature-Rich)**:
 - Contains all terminal manipulation commands
-- Includes AI assistant launchers (`/copilot`, `/claude`, `/cursor`)
+- Includes AI assistant launchers (`/copilot`, `/claude`, `/gemini`)
 - Full special key support for power users
 - Better suited for advanced terminal operations
 
@@ -105,7 +105,7 @@ Commands have been reorganized between the Coder Bot and Xterm Bot to better ali
 
 ### For Users
 
-- **To start AI assistants**: Use Xterm Bot's `/copilot`, `/claude`, or `/cursor` commands
+- **To start AI assistants**: Use Xterm Bot's `/copilot`, `/claude`, or `/gemini` commands
 - **To close sessions**: Use Coder Bot's `/close` command
 - **To send escape**: Both bots support `/esc` (Coder Bot after `/help`, Xterm Bot in full list)
 
@@ -146,13 +146,13 @@ The mycommands menu shows:
 - `/ctrlc` - Send Ctrl+C (interrupt)
 - `/copilot` - Start session with GitHub Copilot ⬅️ Visible
 - `/claude` - Start session with Claude AI ⬅️ Visible
-- `/cursor` - Start session with Cursor AI ⬅️ Visible
+- `/gemini` - Start session with Cursor AI ⬅️ Visible
 - `/start` - Show help message
 
 **Note:** `/close` is NOT shown when there's no active session.
 
 ### After Starting a Session
-When `/copilot`, `/claude`, `/cursor`, or `/xterm` is used, the menu changes to:
+When `/copilot`, `/claude`, `/gemini`, or `/xterm` is used, the menu changes to:
 - `/screen` - Capture terminal screenshot
 - `/help` - Show complete command reference
 - `/tab` - Send Tab character
@@ -161,7 +161,7 @@ When `/copilot`, `/claude`, `/cursor`, or `/xterm` is used, the menu changes to:
 - `/close` - Close the current terminal session ⬅️ Now visible
 - `/start` - Show help message
 
-**Note:** `/copilot`, `/claude`, `/cursor` are removed from the menu.
+**Note:** `/copilot`, `/claude`, `/gemini` are removed from the menu.
 
 ### After Closing a Session
 When `/close` is used, the menu reverts back to the "no session" state with AI assistant commands visible again.

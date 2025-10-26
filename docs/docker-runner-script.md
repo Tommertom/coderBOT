@@ -69,18 +69,21 @@ The script performs the following steps:
    - Configures default settings for terminal, media, and auto-refresh
 
 3. **Creates Custom Dockerfile**
-   - Minimal Linux setup based on `node:20-slim`
-   - Installs bash, git, and essential tools
-   - Installs GitHub CLI
+   - Minimal Linux setup based on `node:22-slim`
+   - Installs build tools (make, python3, build-essential) for node-pty
+   - Installs bash, git, curl, wget, and essential utilities
+   - Installs GitHub CLI from official repository
    - Includes all Puppeteer dependencies for terminal screenshots
-   - Sets up GitHub authentication and Copilot CLI installation
-   - Configures automatic startup with `npx @tommertom/coderbot@latest`
+   - Installs GitHub Copilot CLI globally
+   - Creates startup script that updates Copilot and runs coderBOT
+   - Configures automatic execution with `npx @tommertom/coderbot@latest`
 
 4. **Generates docker-compose.yml**
-   - Simplifies container management
-   - Configures volumes for logs and media
-   - Sets up environment variables
-   - Enables auto-restart policy
+   - Uses build context with local Dockerfile
+   - Configures named volume for persistent media storage
+   - Maps logs directory to host
+   - Enables TTY and stdin for interactive terminal
+   - Sets up auto-restart policy (unless-stopped)
 
 5. **Creates Helper Scripts**
    - `run-docker.sh` - Quick start script

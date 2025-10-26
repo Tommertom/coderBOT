@@ -16,7 +16,7 @@ await new Promise(resolve => setTimeout(resolve, 500));
 await this.sendSessionScreenshot(ctx, userId);
 ```
 
-**Copilot (`/copilot`, `/claude`, `/cursor`)**:
+**Copilot (`/copilot`, `/claude`, `/gemini`)**:
 ```typescript
 // Creates a session WITH data handlers for special terminal output
 const dataHandler = this.coderService.createTerminalDataHandler({
@@ -25,7 +25,7 @@ const dataHandler = this.coderService.createTerminalDataHandler({
 });
 this.xtermService.createSession(userId, chatId, dataHandler);
 await new Promise(resolve => setTimeout(resolve, 500));
-this.xtermService.writeToSession(userId, assistantType); // Writes "copilot", "claude", or "cursor"
+this.xtermService.writeToSession(userId, assistantType); // Writes "copilot", "claude", or "gemini"
 await new Promise(resolve => setTimeout(resolve, 2000));
 await this.sendSessionScreenshot(ctx, userId);
 ```
@@ -40,7 +40,7 @@ await this.sendSessionScreenshot(ctx, userId);
 - User must type their own commands
 
 **Copilot (`/copilot`)**:
-- Automatically writes "copilot", "claude", or "cursor" command
+- Automatically writes "copilot", "claude", or "gemini" command
 - Waits 2 seconds for the AI assistant to load
 - User sees the AI assistant's welcome screen in the screenshot
 
@@ -130,7 +130,7 @@ Both implementations now share these features:
 - Debugging or running system commands
 - Don't need AI assistant integration
 
-**Use `/copilot`, `/claude`, or `/cursor` when:**
+**Use `/copilot`, `/claude`, or `/gemini` when:**
 - Want to interact with an AI coding assistant
 - Need automatic screenshot updates
 - Want interactive confirmation buttons
@@ -155,7 +155,7 @@ The commands have been reorganized between the two bots:
 - `/xterm` - Start raw bash terminal
 - `/copilot` - Start GitHub Copilot session (moved from coder)
 - `/claude` - Start Claude AI session (moved from coder)
-- `/cursor` - Start Cursor AI session (moved from coder)
+- `/gemini` - Start Cursor AI session (moved from coder)
 - `/send` - Send text with Enter
 - `/keys` - Send text without Enter
 - `/tab` - Send Tab
@@ -183,7 +183,7 @@ The commands have been reorganized between the two bots:
 - Both auto-refresh after commands
 
 ❌ **Still Different**:
-- Xterm `/copilot`, `/claude`, `/cursor` do NOT have data handlers for BEL or confirmation monitoring
+- Xterm `/copilot`, `/claude`, `/gemini` do NOT have data handlers for BEL or confirmation monitoring
 - Coder bot is simpler with fewer special key commands
 
 ## Conclusion

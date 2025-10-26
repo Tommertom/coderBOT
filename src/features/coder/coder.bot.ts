@@ -108,6 +108,41 @@ export class CoderBot {
         }
     }
 
+    /**
+     * Callback for handling newly discovered URLs in terminal output
+     */
+    private async handleUrlDiscovered(userId: string, chatId: number, url: string): Promise<void> {
+        if (!this.bot || !this.configService.isAutoNotifyUrlsEnabled()) {
+            return;
+        }
+
+        try {
+            // Send URL notification message
+            const sentMsg = await this.bot.api.sendMessage(
+                chatId,
+                `\`${url}\``,
+                { parse_mode: 'Markdown' }
+            );
+
+            // Schedule message deletion if timeout is configured
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
+            if (deleteTimeout > 0) {
+                const timeout = setTimeout(async () => {
+                    try {
+                        await this.bot?.api.deleteMessage(chatId, sentMsg.message_id);
+                        this.xtermService.clearUrlNotificationTimeout(userId, sentMsg.message_id);
+                    } catch (error) {
+                        console.error('Failed to delete URL notification message:', error);
+                    }
+                }, deleteTimeout);
+
+                this.xtermService.setUrlNotificationTimeout(userId, sentMsg.message_id, timeout);
+            }
+        } catch (error) {
+            console.error('Failed to send URL notification:', error);
+        }
+    }
+
     private async handleBellNotification(userId: string, chatId: number): Promise<void> {
         if (!this.bot) {
             console.error('Bot instance not available for BEL notification');
@@ -181,6 +216,35 @@ export class CoderBot {
             }
         } catch (error) {
             console.error(`Failed to send confirmation notification: ${error}`);
+        }
+    }
+
+    private async handleBoxDetected(userId: string, chatId: number, data: string): Promise<void> {
+        if (!this.bot) {
+            console.error('Bot instance not available for box detection notification');
+            return;
+        }
+
+        try {
+            // Send debug notification to user
+            const message = '🔍 **Box Pattern Detected** (Debug)\n\n' +
+                           `Last 100 chars of buffer:\n\`\`\`\n${data.substring(Math.max(0, data.length - 100))}\n\`\`\``;
+
+            const sentMsg = await this.bot.api.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+
+            // Auto-delete after configured timeout
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
+            if (deleteTimeout > 0) {
+                setTimeout(async () => {
+                    try {
+                        await this.bot!.api.deleteMessage(chatId, sentMsg.message_id);
+                    } catch (error) {
+                        console.error('Failed to delete box detection notification message:', error);
+                    }
+                }, deleteTimeout);
+            }
+        } catch (error) {
+            console.error(`Failed to send box detection notification: ${error}`);
         }
     }
 
@@ -411,11 +475,11 @@ export class CoderBot {
     }
 
     /**
-     * Generic handler for AI assistant commands (copilot, claude, cursor)
+     * Generic handler for AI assistant commands (copilot, claude, gemini)
      */
     private async handleAIAssistant(
         ctx: Context,
-        assistantType: 'copilot' | 'claude' | 'cursor'
+        assistantType: 'copilot' | 'claude' | 'gemini'
     ): Promise<void> {
         const userId = ctx.from!.id.toString();
         const chatId = ctx.chat!.id;
@@ -430,9 +494,15 @@ export class CoderBot {
             const dataHandler = this.coderService.createTerminalDataHandler({
                 onBell: this.handleBellNotification.bind(this),
                 onConfirmationPrompt: this.handleConfirmNotification.bind(this),
+                onBoxDetected: this.handleBoxDetected.bind(this),
             });
 
-            this.xtermService.createSession(userId, chatId, dataHandler);
+            this.xtermService.createSession(
+                userId, 
+                chatId, 
+                dataHandler, 
+                this.handleUrlDiscovered.bind(this)
+            );
 
             await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -454,8 +524,8 @@ export class CoderBot {
         await this.handleAIAssistant(ctx, 'claude');
     }
 
-    private async handleCursor(ctx: Context): Promise<void> {
-        await this.handleAIAssistant(ctx, 'cursor');
+    private async handleGemini(ctx: Context): Promise<void> {
+        await this.handleAIAssistant(ctx, 'gemini');
     }
 
 
@@ -510,7 +580,7 @@ export class CoderBot {
             await ctx.reply(
                 '✅ *Coder Session Closed*\n\n' +
                 'The coder session has been terminated.\n\n' +
-                'Use /copilot, /claude, or /cursor to start a new session.',
+                'Use /copilot, /claude, or /gemini to start a new session.',
                 { parse_mode: 'Markdown' }
             );
         } catch (error) {
@@ -525,7 +595,7 @@ export class CoderBot {
             '*Quick Start:*\n' +
             '/copilot - Start GitHub Copilot CLI\n' +
             '/claude - Start Claude AI\n' +
-            '/cursor - Start Cursor AI\n' +
+            '/gemini - Start Gemini AI\n' +
             '/xterm - Start raw terminal\n' +
             '/help - Show all available commands\n\n' +
             'Send any message to interact with the terminal.\n\n' +
@@ -542,7 +612,7 @@ export class CoderBot {
             '*Starting Sessions:*\n' +
             '/copilot - Start GitHub Copilot CLI session\n' +
             '/claude - Start Claude AI session\n' +
-            '/cursor - Start Cursor AI session\n' +
+            '/gemini - Start Gemini AI session\n' +
             '/xterm - Start raw terminal (no AI)\n' +
             '/startup <prompt> - Set/view auto-startup prompt for /copilot\n' +
             '/close - Close the current terminal session\n\n' +

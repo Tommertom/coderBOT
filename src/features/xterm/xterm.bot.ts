@@ -72,7 +72,7 @@ export class XtermBot {
         bot.command('xterm', AccessControlMiddleware.requireAccess, this.handleXterm.bind(this));
         bot.command('copilot', AccessControlMiddleware.requireAccess, this.handleCopilot.bind(this));
         bot.command('claude', AccessControlMiddleware.requireAccess, this.handleClaude.bind(this));
-        bot.command('cursor', AccessControlMiddleware.requireAccess, this.handleCursor.bind(this));
+        bot.command('gemini', AccessControlMiddleware.requireAccess, this.handleGemini.bind(this));
         bot.command('startup', AccessControlMiddleware.requireAccess, this.handleStartup.bind(this));
         bot.command('keys', AccessControlMiddleware.requireAccess, this.handleKeys.bind(this));
         bot.command('tab', AccessControlMiddleware.requireAccess, this.handleTab.bind(this));
@@ -160,6 +160,41 @@ export class XtermBot {
         }
     }
 
+    /**
+     * Callback for handling newly discovered URLs in terminal output
+     */
+    private async handleUrlDiscovered(userId: string, chatId: number, url: string): Promise<void> {
+        if (!this.bot || !this.configService.isAutoNotifyUrlsEnabled()) {
+            return;
+        }
+
+        try {
+            // Send URL notification message
+            const sentMsg = await this.bot.api.sendMessage(
+                chatId,
+                `\`${url}\``,
+                { parse_mode: 'Markdown' }
+            );
+
+            // Schedule message deletion if timeout is configured
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
+            if (deleteTimeout > 0) {
+                const timeout = setTimeout(async () => {
+                    try {
+                        await this.bot?.api.deleteMessage(chatId, sentMsg.message_id);
+                        this.xtermService.clearUrlNotificationTimeout(userId, sentMsg.message_id);
+                    } catch (error) {
+                        console.error('Failed to delete URL notification message:', error);
+                    }
+                }, deleteTimeout);
+
+                this.xtermService.setUrlNotificationTimeout(userId, sentMsg.message_id, timeout);
+            }
+        } catch (error) {
+            console.error('Failed to send URL notification:', error);
+        }
+    }
+
     private async handleNumberKey(number: string, ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
         const chatId = ctx.chat!.id;
@@ -241,8 +276,13 @@ export class XtermBot {
                 return;
             }
 
-            // Create session without data handlers - xterm is a raw terminal (no copilot monitoring)
-            this.xtermService.createSession(userId, chatId);
+            // Create session with URL notification callback if enabled
+            this.xtermService.createSession(
+                userId, 
+                chatId, 
+                undefined, 
+                this.handleUrlDiscovered.bind(this)
+            );
 
             // Update command menu to show /close instead of AI assistants
             if (this.bot) {
@@ -544,7 +584,7 @@ export class XtermBot {
      */
     private async handleAIAssistant(
         ctx: Context,
-        assistantType: 'copilot' | 'claude' | 'cursor'
+        assistantType: 'copilot' | 'claude' | 'gemini'
     ): Promise<void> {
         const userId = ctx.from!.id.toString();
         const chatId = ctx.chat!.id;
@@ -556,8 +596,13 @@ export class XtermBot {
                 return;
             }
 
-            // Create session without data handlers - xterm doesn't monitor for AI prompts
-            this.xtermService.createSession(userId, chatId);
+            // Create session with URL notification callback if enabled
+            this.xtermService.createSession(
+                userId, 
+                chatId, 
+                undefined, 
+                this.handleUrlDiscovered.bind(this)
+            );
 
             // Update command menu to show /close instead of AI assistants
             if (this.bot) {
@@ -605,8 +650,8 @@ export class XtermBot {
         await this.handleAIAssistant(ctx, 'claude');
     }
 
-    private async handleCursor(ctx: Context): Promise<void> {
-        await this.handleAIAssistant(ctx, 'cursor');
+    private async handleGemini(ctx: Context): Promise<void> {
+        await this.handleAIAssistant(ctx, 'gemini');
     }
 
     private async handleCallbackQuery(ctx: Context): Promise<void> {

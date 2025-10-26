@@ -11,6 +11,8 @@ export interface PtySession {
     lastScreenshotMessageId?: number;
     refreshInterval?: NodeJS.Timeout;
     discoveredUrls?: Set<string>;
+    notifiedUrls?: Set<string>;
+    urlNotificationTimeouts?: Map<number, NodeJS.Timeout>;
 }
 
 export interface XtermSession {

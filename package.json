@@ -44,12 +44,12 @@
   "author": "Tommertom",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Tommertom/coderBOT.git"
+    "url": "git+https://github.com/Tommertom/shippi-coderBOT.git"
   },
   "bugs": {
-    "url": "https://github.com/Tommertom/coderBOT/issues"
+    "url": "https://github.com/Tommertom/shippi-coderBOT/issues"
   },
-  "homepage": "https://github.com/Tommertom/coderBOT#readme",
+  "homepage": "https://github.com/Tommertom/shippi-coderBOT#readme",
   "license": "MIT",
   "type": "module",
   "engines": {

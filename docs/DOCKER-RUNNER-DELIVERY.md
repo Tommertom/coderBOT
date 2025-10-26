@@ -149,9 +149,12 @@ Generated on run (in /tmp):
 ## 🎯 Key Capabilities
 
 ### Minimal Docker Image
-- **Base**: node:20-slim (~500MB vs 1.5GB)
-- **Includes**: Only essentials (bash, git, GitHub CLI, Node.js)
-- **Fast**: Quick builds and deployments
+- **Base**: node:22-slim (~200MB, optimized for size)
+- **Includes**: Build tools (make, python3, build-essential) for node-pty compilation
+- **GitHub**: GitHub CLI installed from official repository
+- **Copilot**: GitHub Copilot CLI pre-installed
+- **Dependencies**: Full Puppeteer dependencies for terminal screenshots
+- **Fast**: Optimized build process with multi-stage commands
 
 ### GitHub Integration
 - **CLI**: GitHub CLI (`gh`) pre-installed

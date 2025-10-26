@@ -8,7 +8,7 @@ export class CommandMenuUtils {
     private static readonly COMMANDS_NO_SESSION: BotCommand[] = [
         { command: 'copilot', description: 'Start a new terminal session with Copilot' },
         { command: 'claude', description: 'Start a new terminal session with Claude' },
-        { command: 'cursor', description: 'Start a new terminal session with Cursor' },
+        { command: 'gemini', description: 'Start a new terminal session with Gemini' },
         { command: 'xterm', description: 'Start a raw terminal session (no AI)' },
         { command: 'screen', description: 'Capture and view terminal screenshot' },
         { command: 'help', description: 'Show complete command reference' },

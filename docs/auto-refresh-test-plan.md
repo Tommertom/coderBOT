@@ -3,7 +3,7 @@
 ## Test Environment Setup
 1. Start the coderBOT application
 2. Open Telegram and connect to the bot
-3. Start a session with `/copilot`, `/claude`, or `/cursor`
+3. Start a session with `/copilot`, `/claude`, or `/gemini`
 4. Use `/screen` to take an initial screenshot
 
 ## Test Cases

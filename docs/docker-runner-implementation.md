@@ -159,20 +159,21 @@ CONTROL_BOT_ADMIN_IDS=
 ```
 
 ### Dockerfile Highlights
-- Base: `node:20-slim`
-- GitHub CLI installation
-- Puppeteer dependencies
-- Startup script with GitHub authentication
-- Copilot CLI installation
-- npx command to run coderBOT
+- Base: `node:22-slim`
+- GitHub CLI installation from official repository
+- Puppeteer dependencies for terminal screenshots
+- Build tools (make, python3, build-essential) for node-pty compilation
+- GitHub Copilot CLI installed globally
+- Startup script that updates Copilot and runs coderBOT via npx
+- .env file copied into container
 
 ### docker-compose.yml Features
 - Service name: `coderbot`
 - Container name: `coderbot-instance`
-- Environment: GitHub PAT passed at runtime
-- Volumes: logs and media
+- Build from local Dockerfile (context: .)
+- Volumes: logs directory and named volume for media
 - Restart policy: `unless-stopped`
-- TTY enabled for interactive terminal
+- TTY and stdin enabled for interactive terminal sessions
 
 ## Management Commands
 

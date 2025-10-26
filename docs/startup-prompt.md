@@ -104,5 +104,5 @@ The system will:
 
 - Only messages starting with `./cwd` are stored as startup prompts
 - Each bot has its own unique startup prompt file
-- The prompt is sent automatically only for `/copilot` (not `/claude` or `/cursor`)
+- The prompt is sent automatically only for `/copilot` (not `/claude` or `/gemini`)
 - You can update the prompt by sending a new `./cwd` message

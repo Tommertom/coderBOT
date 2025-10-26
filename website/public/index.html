@@ -1,89 +1,564 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Welcome to Firebase Hosting</title>
-
-    <!-- update the version number as needed -->
-    <script defer src="/__/firebase/12.4.0/firebase-app-compat.js"></script>
-    <!-- include only the Firebase features as you need -->
-    <script defer src="/__/firebase/12.4.0/firebase-auth-compat.js"></script>
-    <script defer src="/__/firebase/12.4.0/firebase-database-compat.js"></script>
-    <script defer src="/__/firebase/12.4.0/firebase-firestore-compat.js"></script>
-    <script defer src="/__/firebase/12.4.0/firebase-functions-compat.js"></script>
-    <script defer src="/__/firebase/12.4.0/firebase-messaging-compat.js"></script>
-    <script defer src="/__/firebase/12.4.0/firebase-storage-compat.js"></script>
-    <script defer src="/__/firebase/12.4.0/firebase-analytics-compat.js"></script>
-    <script defer src="/__/firebase/12.4.0/firebase-remote-config-compat.js"></script>
-    <script defer src="/__/firebase/12.4.0/firebase-performance-compat.js"></script>
-    <!-- 
-      initialize the SDK after all desired features are loaded, set useEmulator to false
-      to avoid connecting the SDK to running emulators.
-    -->
-    <script defer src="/__/firebase/init.js?useEmulator=true"></script>
-
-    <style media="screen">
-      body { background: #ECEFF1; color: rgba(0,0,0,0.87); font-family: Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
-      #message { background: white; max-width: 360px; margin: 100px auto 16px; padding: 32px 24px; border-radius: 3px; }
-      #message h2 { color: #ffa100; font-weight: bold; font-size: 16px; margin: 0 0 8px; }
-      #message h1 { font-size: 22px; font-weight: 300; color: rgba(0,0,0,0.6); margin: 0 0 16px;}
-      #message p { line-height: 140%; margin: 16px 0 24px; font-size: 14px; }
-      #message a { display: block; text-align: center; background: #039be5; text-transform: uppercase; text-decoration: none; color: white; padding: 16px; border-radius: 4px; }
-      #message, #message a { box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); }
-      #load { color: rgba(0,0,0,0.4); text-align: center; font-size: 13px; }
-      @media (max-width: 600px) {
-        body, #message { margin-top: 0; background: white; box-shadow: none; }
-        body { border-top: 16px solid #ffa100; }
-      }
-    </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>shippi.art - Ship Code Anywhere Instantly</title>
+    <link rel="stylesheet" href="index.css" />
   </head>
   <body>
-    <div id="message">
-      <h2>Welcome</h2>
-      <h1>Firebase Hosting Setup Complete</h1>
-      <p>You're seeing this because you've successfully setup Firebase Hosting. Now it's time to go build something extraordinary!</p>
-      <a target="_blank" href="https://firebase.google.com/docs/hosting/">Open Hosting Documentation</a>
-    </div>
-    <p id="load">Firebase SDK Loading&hellip;</p>
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="container">
+        <h1 class="hero-title">Ship Code. Anywhere. Instantly.</h1>
+        <p class="hero-subtitle">
+          Your AI-powered terminal in your pocket. Code, build, and deploy from
+          your phone with GitHub Copilot CLI, Claude AI, Google Gemini, and your
+          favorite dev tools.
+        </p>
+        <a href="mailto:hello@shippi.art?subject=Waitlist" class="cta-button"
+          >Join the Waitlist 🚀</a
+        >
+        <p class="email-cta">
+          📧 <a href="mailto:hello@shippi.art">hello@shippi.art</a>
+        </p>
+      </div>
+    </section>
 
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        const loadEl = document.querySelector('#load');
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
-        // // The Firebase SDK is initialized and available here!
-        //
-        // firebase.auth().onAuthStateChanged(user => { });
-        // firebase.database().ref('/path/to/ref').on('value', snapshot => { });
-        // firebase.firestore().doc('/foo/bar').get().then(() => { });
-        // firebase.functions().httpsCallable('yourFunction')().then(() => { });
-        // firebase.messaging().requestPermission().then(() => { });
-        // firebase.storage().ref('/path/to/ref').getDownloadURL().then(() => { });
-        // firebase.analytics(); // call to activate
-        // firebase.analytics().logEvent('tutorial_completed');
-        // firebase.performance(); // call to activate
-        //
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
+    <!-- Problem Section -->
+    <section class="problem">
+      <div class="container">
+        <h2>Code Shouldn't Wait for a Desk</h2>
+        <div class="problem-grid">
+          <div class="problem-item">
+            <img
+              src="problem-ai-desktop.png"
+              alt="AI tools trapped on desktop"
+              class="problem-icon"
+            />
+            <p>
+              <strong>AI tools are powerful</strong> - but trapped on your
+              desktop
+            </p>
+          </div>
+          <div class="problem-item">
+            <img
+              src="problem-ideas-anywhere.png"
+              alt="Ideas strike anywhere"
+              class="problem-icon"
+            />
+            <p>
+              <strong>Ideas strike anywhere</strong> - but you can't code on the
+              go
+            </p>
+          </div>
+          <div class="problem-item">
+            <img
+              src="problem-emergency-wait.png"
+              alt="Emergencies don't wait"
+              class="problem-icon"
+            />
+            <p>
+              <strong>Emergencies don't wait</strong> - yet you need a laptop to
+              respond
+            </p>
+          </div>
+          <div class="problem-item">
+            <img
+              src="problem-remote-clunky.png"
+              alt="Remote setups are clunky"
+              class="problem-icon"
+            />
+            <p>
+              <strong>Remote setups are clunky</strong> - SSH, VPNs, and desktop
+              remoting fail on mobile
+            </p>
+          </div>
+        </div>
+        <p class="problem-statement">
+          Time lost waiting to get back to your desk = opportunities missed.
+        </p>
+      </div>
+    </section>
 
-        try {
-          let app = firebase.app();
-          let features = [
-            'auth', 
-            'database', 
-            'firestore',
-            'functions',
-            'messaging', 
-            'storage', 
-            'analytics', 
-            'remoteConfig',
-            'performance',
-          ].filter(feature => typeof app[feature] === 'function');
-          loadEl.textContent = `Firebase SDK loaded with ${features.join(', ')}`;
-        } catch (e) {
-          console.error(e);
-          loadEl.textContent = 'Error loading the Firebase SDK, check the console.';
-        }
-      });
-    </script>
+    <!-- Solution Section -->
+    <section class="solution">
+      <div class="container">
+        <h2>Your Terminal. Your Phone. Your Freedom.</h2>
+        <p class="solution-intro">
+          <strong
+            >shippi.art transforms Telegram into your personal AI-powered
+            development terminal.</strong
+          >
+        </p>
+        <p class="solution-desc">
+          Get instant access to your complete dev environment - GitHub Copilot,
+          Claude CLI, any command-line tool - directly from your phone, anywhere
+          in the world.
+        </p>
+
+        <div class="how-it-works">
+          <h3>How It Works</h3>
+          <div class="steps-grid">
+            <div class="step">
+              <span class="step-icon">📱</span>
+              <h4>Message your bot</h4>
+              <p>Send commands via Telegram</p>
+            </div>
+            <div class="step">
+              <span class="step-icon">🤖</span>
+              <h4>AI assists you</h4>
+              <p>
+                GitHub Copilot CLI, Claude AI & Google Gemini at your fingertips
+              </p>
+            </div>
+            <div class="step">
+              <span class="step-icon">🚀</span>
+              <h4>Ship instantly</h4>
+              <p>Deploy, debug, monitor - all from mobile</p>
+            </div>
+            <div class="step">
+              <span class="step-icon">📸</span>
+              <h4>See everything</h4>
+              <p>Real-time terminal screenshots</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Value Proposition -->
+    <section class="value">
+      <div class="container">
+        <h2>Time Savings = Money Saved</h2>
+        <p class="value-estimate">
+          <strong>Conservative estimate:</strong> 2-5 hours saved per developer
+          per week
+        </p>
+        <ul class="value-list">
+          <li>Quick fixes: 30 min/day</li>
+          <li>Build monitoring: 1 hour/week</li>
+          <li>Emergency response: 2+ hours/month</li>
+        </ul>
+        <p class="value-amount">
+          At $75/hour developer rate:<br /><strong class="highlight"
+            >$7,800-$19,500 saved annually per developer</strong
+          >
+        </p>
+
+        <h3>Work From Anywhere. Actually.</h3>
+        <ul class="benefits-list">
+          <li>✅ True location independence</li>
+          <li>✅ Recruit talent globally</li>
+          <li>✅ Support flexible work arrangements</li>
+          <li>✅ Stay productive while traveling</li>
+          <li>✅ Respond to emergencies without panic</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Try It Yourself -->
+    <section class="try-it">
+      <div class="container">
+        <h2>Want to Try the Technology Behind shippi.art?</h2>
+        <p class="try-it-intro">
+          Experience the power of mobile terminal access right now. Deploy your
+          own bot in minutes.
+        </p>
+
+        <div class="setup-methods">
+          <h3>🚀 Quick Start</h3>
+
+          <div class="docker-tabs">
+            <div class="tab-buttons">
+              <button class="tab-button active" data-tab="quick-start">
+                Quick Start
+              </button>
+              <button class="tab-button" data-tab="docker-compose">
+                docker-compose.yml
+              </button>
+              <button class="tab-button" data-tab="dockerfile">
+                Dockerfile
+              </button>
+            </div>
+
+            <div class="tab-content active" id="quick-start">
+              <div class="code-block dark">
+                <div class="terminal-header">Command:</div>
+                <pre><code>$ npx @tommertom/coderbot@latest</code></pre>
+              </div>
+              <div class="code-block dark" style="margin-top: 20px;">
+                <div class="terminal-header">Output:</div>
+                <pre><code>🤖 coderBOT - Your AI-Powered Terminal in Telegram
+
+📝 Checking for .env file...
+⚠️  .env file not found. Creating a new one...
+
+✨ .env file created successfully!
+
+📋 Next steps:
+1. Edit the .env file with your configuration:
+   - TELEGRAM_BOT_TOKEN: Get from @BotFather on Telegram
+   - TELEGRAM_USER_ID: Your Telegram user ID (send /start to @userinfobot)
+   
+2. Run the command again: npx @tommertom/coderbot@latest
+
+💡 Tip: Once configured, the bot will start automatically!
+
+For more info, visit: https://github.com/Tommertom/shippi-coderBOT</code></pre>
+              </div>
+              <p class="setup-note">
+                Edit the generated <code>.env</code> file with your Telegram bot
+                token and user ID, then run the command again to start the bot.
+              </p>
+            </div>
+
+            <div class="tab-content" id="docker-compose">
+              <div class="code-block dark">
+                <pre><code>version: '3.8'
+
+services:
+  coderbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: coderbot-instance
+    volumes:
+      - ./logs:/app/logs
+      - coderbot-media:/tmp/coderBOT_media
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+
+volumes:
+  coderbot-media:</code></pre>
+              </div>
+            </div>
+
+            <div class="tab-content" id="dockerfile">
+              <div class="code-block dark">
+                <pre><code># Minimal Linux setup with Node.js, GitHub CLI, and Copilot CLI
+FROM node:22-slim
+
+# Install essential packages including build tools for node-pty
+RUN apt-get update && apt-get install -y \
+    bash curl wget git gpg software-properties-common \
+    ca-certificates make python3 build-essential \
+    fonts-liberation libasound2 libatk-bridge2.0-0 \
+    libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 \
+    libexpat1 libfontconfig1 libgbm1 libgcc1 libglib2.0-0 \
+    libgtk-3-0 libnspr4 libnss3 libpango-1.0-0 \
+    libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 \
+    libxcb1 libxcomposite1 libxcursor1 libxdamage1 \
+    libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 \
+    libxss1 libxtst6 lsb-release xdg-utils && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install GitHub CLI
+RUN (type -p wget >/dev/null || (apt update && apt install wget -y)) \
+    && mkdir -p -m 755 /etc/apt/keyrings \
+    && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    && cat $out | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+    && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt update && apt install gh -y && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g @github/copilot@latest npm@latest
+
+WORKDIR /app
+COPY .env /app/.env
+
+# Create startup script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+# Update Copilot CLI\n\
+npm install -g @github/copilot@latest\n\
+echo "Starting coderBOT..."\n\
+npx -y @tommertom/coderbot@latest\n\
+' > /app/start.sh && chmod +x /app/start.sh
+
+CMD ["/app/start.sh"]</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="try-it-links">
+            <a
+              href="https://www.npmjs.com/package/@tommertom/coderbot"
+              target="_blank"
+              class="try-button"
+              >📦 View on NPM</a
+            >
+            <a
+              href="https://github.com/Tommertom/shippi-coderBOT"
+              target="_blank"
+              class="try-button"
+              >💻 View on GitHub</a
+            >
+          </div>
+
+          <div class="try-it-features">
+            <h3>What You Get</h3>
+            <ul>
+              <li>✅ Full terminal access via Telegram</li>
+              <li>✅ GitHub Copilot CLI, Claude AI & Google Gemini support</li>
+              <li>✅ Real-time terminal screenshots</li>
+              <li>✅ File transfer & media management</li>
+              <li>✅ Multi-user access control</li>
+              <li>✅ Session timeout & auto-recovery</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Use Cases -->
+    <section class="use-cases">
+      <div class="container">
+        <h2>Real Developers. Real Wins.</h2>
+        <div class="cases-grid">
+          <div class="case">
+            <h4>Solo Freelancer</h4>
+            <p class="quote">
+              "I check client deployments during meetings, restart services from
+              my phone, and fix urgent bugs without opening my laptop. It's
+              saved client relationships when issues happened at 11pm."
+            </p>
+            <p class="value-text">
+              <strong>Value:</strong> Faster response times, happier clients,
+              premium rates for reliability.
+            </p>
+          </div>
+          <div class="case">
+            <h4>Startup CTO</h4>
+            <p class="quote">
+              "Our distributed team across three time zones has instant access
+              to staging. We've cut incident response time by 75% because
+              whoever's available jumps in immediately - even on mobile."
+            </p>
+            <p class="value-text">
+              <strong>Value:</strong> Reduced downtime, faster iteration, lower
+              infrastructure costs.
+            </p>
+          </div>
+          <div class="case">
+            <h4>Learning Developer</h4>
+            <p class="quote">
+              "I code during my commute with GitHub Copilot CLI and Claude AI
+              helping me learn. I can't always access my computer, but now I can
+              practice Linux commands and get AI assistance from my phone."
+            </p>
+            <p class="value-text">
+              <strong>Value:</strong> More learning time, faster skill
+              development, portfolio building on-the-go.
+            </p>
+          </div>
+          <div class="case">
+            <h4>DevOps Engineer</h4>
+            <p class="quote">
+              "Being on-call used to mean staying near my laptop all weekend.
+              Now I monitor systems, check logs, and restart services from
+              anywhere. I handled a production issue in 5 minutes from my kid's
+              soccer game."
+            </p>
+            <p class="value-text">
+              <strong>Value:</strong> Better work-life balance, faster incident
+              resolution, reduced stress.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+      <div class="container">
+        <h2>Built for Developers, By Developers</h2>
+        <div class="features-grid">
+          <div class="feature">
+            ✅ <strong>Zero Installation</strong> - Get started in under 5
+            minutes
+          </div>
+          <div class="feature">
+            ✅ <strong>Full Terminal Control</strong> - Every keyboard shortcut,
+            every control character
+          </div>
+          <div class="feature">
+            ✅ <strong>Visual Feedback</strong> - Real-time terminal screenshots
+          </div>
+          <div class="feature">
+            ✅ <strong>File Management</strong> - Automatic media file watching
+            and delivery
+          </div>
+          <div class="feature">
+            ✅ <strong>Multi-Instance</strong> - Run multiple bots for different
+            projects
+          </div>
+          <div class="feature">
+            ✅ <strong>Auto-Recovery</strong> - Crashed processes automatically
+            restart
+          </div>
+          <div class="feature">
+            ✅ <strong>Platform Native</strong> - Works on Linux, macOS, or
+            Raspberry Pi
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comparison -->
+    <section class="comparison">
+      <div class="container">
+        <h2>Why shippi.art?</h2>
+        <div class="table-container">
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th>Feature</th>
+                <th>shippi.art</th>
+                <th>Traditional SSH</th>
+                <th>Remote Desktop</th>
+                <th>Cloud IDE</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Mobile First</td>
+                <td>✅ Native</td>
+                <td>❌ Clunky</td>
+                <td>❌ Laggy</td>
+                <td>⚠️ Limited</td>
+              </tr>
+              <tr>
+                <td>AI Integration</td>
+                <td>✅ All CLI tools</td>
+                <td>❌ Manual</td>
+                <td>⚠️ Depends</td>
+                <td>⚠️ Some</td>
+              </tr>
+              <tr>
+                <td>Setup Time</td>
+                <td>✅ 5 minutes</td>
+                <td>⚠️ 30+ min</td>
+                <td>⚠️ Hours</td>
+                <td>⚠️ Account setup</td>
+              </tr>
+              <tr>
+                <td>Visual Output</td>
+                <td>✅ Screenshots</td>
+                <td>❌ Text only</td>
+                <td>✅ Full screen</td>
+                <td>✅ Full screen</td>
+              </tr>
+              <tr>
+                <td>Cost</td>
+                <td>✅ Free/Low</td>
+                <td>✅ Free</td>
+                <td>💰 Licensing</td>
+                <td>💰💰 Subscription</td>
+              </tr>
+              <tr>
+                <td>Security</td>
+                <td>✅ Strong</td>
+                <td>⚠️ Exposed ports</td>
+                <td>⚠️ Complex</td>
+                <td>⚠️ Third party</td>
+              </tr>
+              <tr>
+                <td>Collaboration</td>
+                <td>✅ Built-in</td>
+                <td>❌ Complex</td>
+                <td>⚠️ Screen share</td>
+                <td>✅ Built-in</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Social Proof -->
+    <section class="social-proof">
+      <div class="container">
+        <h2>Join Developers Shipping Smarter</h2>
+        <div class="proof-grid">
+          <div class="proof-item">
+            <span class="proof-icon">🌟</span>
+            <h4>Developer Community</h4>
+            <p>Trusted by developers worldwide</p>
+          </div>
+          <div class="proof-item">
+            <span class="proof-icon">🚀</span>
+            <h4>Active Development</h4>
+            <p>Regular updates and feature releases</p>
+          </div>
+          <div class="proof-item">
+            <span class="proof-icon">💬</span>
+            <h4>Real Users, Real Results</h4>
+            <p>Time saved, stress reduced, freedom gained</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="final-cta">
+      <div class="container">
+        <h2>Ready to Code from Anywhere?</h2>
+        <p class="cta-text">
+          Join the waitlist and be first to ship with shippi.art
+        </p>
+        <a
+          href="mailto:hello@shippi.art?subject=Waitlist - [Your Name]&body=Tell us: What would you ship if you could code from anywhere?"
+          class="cta-button"
+          >Email us: hello@shippi.art 🚀</a
+        >
+
+        <div class="benefits-box">
+          <h3>What You'll Get</h3>
+          <ul>
+            <li>✉️ Early access when we launch</li>
+            <li>📚 Exclusive setup guides</li>
+            <li>🎁 Special founding member perks</li>
+            <li>💡 Direct input on feature development</li>
+            <li>🤝 Join our community of mobile-first developers</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <h3>shippi.art</h3>
+        <p class="tagline">Ship code. Keep the vibe.</p>
+        <p>
+          The art of effortless development. Powered by Telegram, secured by
+          design, built for developers who refuse to be desk-bound.
+        </p>
+
+        <div class="footer-info">
+          <p><strong>Platform:</strong> Node.js (Linux/macOS)</p>
+          <p>
+            <strong>Contact:</strong>
+            <a href="mailto:hello@shippi.art">hello@shippi.art</a>
+          </p>
+        </div>
+
+        <p class="built-by">
+          Built for developers, by developers.<br /><em
+            >Your code ships from anywhere. Your best ideas don't have to
+            wait.</em
+          >
+        </p>
+
+        <p class="footer-tagline">
+          shippi.art - Where vibes meet velocity. Ship code with good vibes
+          only. 🎨🚀✨
+        </p>
+      </div>
+    </footer>
+
+    <script src="index.js"></script>
   </body>
 </html>

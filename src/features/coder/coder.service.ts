@@ -5,12 +5,15 @@ import * as path from 'path';
 export interface TerminalDataHandlers {
     onBell?: (userId: string, chatId: number) => void;
     onConfirmationPrompt?: (userId: string, chatId: number, data: string) => void;
+    onBoxDetected?: (userId: string, chatId: number, data: string) => void;
 }
 
 export class CoderService {
     private config: CoderConfig;
     private dataBuffers: Map<string, string> = new Map();
+    private lastBoxDetection: Map<string, number> = new Map();
     private botId: string;
+    private readonly BOX_DETECTION_DEBOUNCE_MS = 5000; // 5 seconds debounce
 
     constructor(configService: ConfigService, botId: string) {
         this.botId = botId;
@@ -39,11 +42,14 @@ export class CoderService {
     }
 
     clearBuffer(userId: string, chatId: number): void {
-        this.dataBuffers.delete(this.getBufferKey(userId, chatId));
+        const key = this.getBufferKey(userId, chatId);
+        this.dataBuffers.delete(key);
+        this.lastBoxDetection.delete(key);
     }
 
     clearAllBuffers(): void {
         this.dataBuffers.clear();
+        this.lastBoxDetection.clear();
     }
 
     getMediaPath(): string {
@@ -66,10 +72,28 @@ export class CoderService {
         return (userId: string, chatId: number, data: string) => {
             // Append incoming data to buffer for this session
             const buffer = this.appendToBuffer(userId, chatId, data);
+            const sessionKey = this.getBufferKey(userId, chatId);
 
             // Check for BEL character (ASCII 0x07)
             if (data.includes('\x07') && handlers.onBell) {
                 handlers.onBell(userId, chatId);
+            }
+
+            // Box detection - check buffer (not just current data chunk) for box drawing characters
+            // Common box patterns: ╭─, ┌─, ┏━, ╔═
+            const boxPatterns = ['╭─', '┌─', '┏━', '╔═'];
+            const hasBoxPattern = boxPatterns.some(pattern => buffer.includes(pattern));
+            
+            if (hasBoxPattern && handlers.onBoxDetected) {
+                // Debounce: only trigger if enough time has passed since last detection
+                const now = Date.now();
+                const lastDetection = this.lastBoxDetection.get(sessionKey) || 0;
+                
+                if (now - lastDetection > this.BOX_DETECTION_DEBOUNCE_MS) {
+                    console.log('[DEBUG] Box pattern detected in buffer:', buffer.substring(Math.max(0, buffer.length - 100)));
+                    this.lastBoxDetection.set(sessionKey, now);
+                    handlers.onBoxDetected(userId, chatId, buffer);
+                }
             }
 
             // Check for Copilot confirmation prompts in the buffered data

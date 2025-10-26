@@ -194,6 +194,8 @@ RUN (type -p wget >/dev/null || (apt update && apt install wget -y)) \
 
 RUN npm install -g @github/copilot@latest
 RUN npm install -g npm@latest
+RUN npm install -g @google/gemini-cli@latest
+RUN npm install -g @anthropic-ai/claude-code@latest
 
 # Create working directory
 WORKDIR /app
@@ -205,9 +207,13 @@ COPY .env /app/.env
 RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
+\n\
 # Update Copilot CLI\n\
 npm install -g @github/copilot@latest\n\
+npm install -g @anthropic-ai/claude-code@latest\n\
+npm install -g @google/gemini-cli@latest\n\
 \n\
+
 # Run coderBOT using npx -y latest\n\
 echo "Starting coderBOT..."\n\
 npx -y @tommertom/coderbot@latest\n\

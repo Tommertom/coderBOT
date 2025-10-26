@@ -4,8 +4,9 @@
 
 ### Session Management
 - `/copilot` - Start GitHub Copilot CLI session
-- `/claude` - Start Claude AI session  
-- `/cursor` - Start Cursor AI session
+- `/claude` - Start Claude AI session
+- `/gemini` - Start Google Gemini session
+- `/gemini` - Start Gemini AI session
 - `/xterm` - Start raw terminal (no AI)
 - `/startup <prompt>` - Set/view auto-startup prompt for /copilot
 - `/close` - Close the current terminal session
