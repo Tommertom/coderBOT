@@ -12,6 +12,7 @@ export class CommandMenuUtils {
         { command: 'xterm', description: 'Start a raw terminal session (no AI)' },
         { command: 'screen', description: 'Capture and view terminal screenshot' },
         { command: 'help', description: 'Show complete command reference' },
+        { command: 'close', description: 'Close the current terminal session' },
         { command: 'start', description: 'Show welcome and quick start guide' },
     ];
 
@@ -23,6 +24,7 @@ export class CommandMenuUtils {
         { command: 'ctrlc', description: 'Send Ctrl+C (interrupt)' },
         { command: 'esc', description: 'Send Escape key' },
         { command: 'help', description: 'Show complete command reference' },
+        { command: 'start', description: 'Show welcome and quick start guide' },
     ];
 
     /**

@@ -199,7 +199,7 @@ export class XtermBot {
             try {
                 this.xtermService.writeRawToSession(userId, number);
                 const sentMsg = await ctx.reply(SuccessMessages.SENT(number));
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 0.5);
                 this.triggerAutoRefresh(userId, chatId);
             } catch (error) {
                 await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_KEY, error));
@@ -253,7 +253,7 @@ export class XtermBot {
                 const charDisplay = char === '\\' ? '\\\\' : char;
                 const sentMsg = await ctx.reply(SuccessMessages.SENT_CONTROL_KEY(charDisplay.toUpperCase()));
 
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 0.5);
                 this.triggerAutoRefresh(userId, chatId);
             } catch (error) {
                 await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_CONTROL_CHARACTER, error));
@@ -274,16 +274,7 @@ export class XtermBot {
 
             // Send spawning message with half timeout deletion
             const spawningMsg = await ctx.reply(Messages.SPAWNING_SESSION);
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await ctx.api.deleteMessage(chatId, spawningMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete spawning message:', error);
-                    }
-                }, deleteTimeout / 2);
-            }
+            await MessageUtils.scheduleMessageDeletion(ctx, spawningMsg.message_id, this.configService, 0.5);
 
             // Create session with buffering callback
             this.xtermService.createSession(
@@ -330,7 +321,7 @@ export class XtermBot {
                 this.xtermService.writeRawToSession(userId, keys);
 
                 const sentMsg = await ctx.reply(`✅ Sent keys: \`${keys}\`\n\n${Messages.VIEW_SCREEN_HINT}`, { parse_mode: 'Markdown' });
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 0.5);
                 this.triggerAutoRefresh(userId, chatId);
             } catch (error) {
                 await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_KEYS, error));
@@ -359,7 +350,7 @@ export class XtermBot {
                     ? await ctx.reply(SuccessMessages.SENT_CONTROL_KEY(keyConfig.display))
                     : await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY(keyConfig.display));
 
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 0.5);
                 this.triggerAutoRefresh(userId, chatId);
             } catch (error) {
                 await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_KEY, error));

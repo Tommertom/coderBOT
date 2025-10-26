@@ -8,7 +8,7 @@ export const Messages = {
         'Use /close to terminate it first, or continue using it.',
 
     // View/refresh hints
-    VIEW_SCREEN_HINT: 'Use /screen to view the output or refresh.',
+    VIEW_SCREEN_HINT: 'Use /screen to view the output.',
 
     // Session close messages
     NO_SESSION_TO_CLOSE: '⚠️ No active terminal session to close.\n\nUse /start to start one.',
@@ -28,12 +28,10 @@ export const Messages = {
  */
 export const SuccessMessages = {
     SENT: (text?: string) => text ? `✅ Sent: ${text}` : '✅ Sent',
-    SENT_WITH_HINT: (text?: string) =>
-        `✅ Sent${text ? `: ${text}` : ''}\n\n${Messages.VIEW_SCREEN_HINT}`,
     SENT_CONTROL_KEY: (key: string) =>
-        `✅ Sent Ctrl+${key}\n\n${Messages.VIEW_SCREEN_HINT}`,
+        `✅ Sent Ctrl+${key}`,
     SENT_SPECIAL_KEY: (keyName: string) =>
-        `✅ Sent ${keyName}\n\n${Messages.VIEW_SCREEN_HINT}`,
+        `✅ Sent ${keyName}`,
 } as const;
 
 /**

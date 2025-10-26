@@ -472,6 +472,10 @@ export class CoderBot {
                 return;
             }
 
+            // Send spawning message with half timeout deletion
+            const spawningMsg = await ctx.reply(Messages.SPAWNING_SESSION);
+            await MessageUtils.scheduleMessageDeletion(ctx, spawningMsg.message_id, this.configService, 0.5);
+
             const dataHandler = this.coderService.createTerminalDataHandler({
                 onBell: this.handleBellNotification.bind(this),
                 onConfirmationPrompt: this.handleConfirmNotification.bind(this),
@@ -658,17 +662,18 @@ export class CoderBot {
     private async handleHelp(ctx: Context): Promise<void> {
         const sentMsg = await ctx.reply(
             '🤖 *CoderBOT - Complete Command Reference*\n\n' +
-            '*Starting Sessions:*\n' +
+            '*Starting\n Sessions:*\n' +
             '/copilot - Start GitHub Copilot CLI session\n' +
             '/claude - Start Claude AI session\n' +
             '/gemini - Start Gemini AI session\n' +
             '/xterm - Start raw terminal (no AI)\n' +
             '/startup <prompt> - Set/view auto-startup prompt for /copilot\n' +
             '/close - Close the current terminal session\n\n' +
-            '*Sending Text to Terminal:*\n' +
+            '*Sending Coder Commands to Terminal:*\n' +
             'Type any message (not starting with /) - Sent directly to terminal with Enter\n' +
-            '.command - Send command (dot prefix removed, Enter added automatically)\n' +
-            '*Tip:* Use \\[media\\] in your text - it will be replaced with the media directory path\n\n' +
+            '.prompt or command - Place a dot to send / commands or literal prompts.\n' +
+            '/keys <text> - Send text without Enter\n\n' +
+            '*Tip:* Use \\[media\] in your text - it will be replaced with the media directory path\n\n' +
             '*Special Keys:*\n' +
             '/tab - Send Tab character\n' +
             '/enter - Send Enter key\n' +
@@ -680,7 +685,6 @@ export class CoderBot {
             '/ctrl <char> - Send any Ctrl+ combination (a-z, @, \\[, \\\\, \\], ^, \\_, ?)\n' +
             '/arrowup - Send Arrow Up key\n' +
             '/arrowdown - Send Arrow Down key\n' +
-            '/keys <text> - Send text without Enter\n' +
             '/1, /2, /3, /4, /5 - Send number keys\n\n' +
             '*Viewing Output:*\n' +
             '/screen - Capture and view terminal screenshot\n' +
@@ -688,7 +692,7 @@ export class CoderBot {
             'Click 🔄 Refresh button on screenshots to update\n\n' +
             '*Media:*\n' +
             '• Upload photos or files - Automatically saved to received directory\n' +
-            '• Files copied to \\[media\] directory will be sent to you automatically\n' +
+            '• Files copied to \\[media\\] directory will be sent to you automatically\n' +
             '• Use \\[media\] in commands - e.g., "cp output.png \\[media\\]" to send files\n' +
             '• The bot watches this directory and sends any new files to you\n\n' +
             '*Other:*\n' +
