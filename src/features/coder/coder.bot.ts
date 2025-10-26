@@ -208,7 +208,7 @@ export class CoderBot {
                     chat: { id: chatId }
                 } as Context;
 
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 0.2);
             } catch (error) {
                 console.error(`Failed to send confirmation notification: ${error}`);
             } finally {

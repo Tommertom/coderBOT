@@ -160,37 +160,6 @@ export class XtermBot {
         }
     }
 
-    /**
-     * Callback for handling when buffer stops changing (debugging/testing)
-     */
-    private async handleBufferingEnded(userId: string, chatId: number): Promise<void> {
-        if (!this.bot) {
-            return;
-        }
-
-        try {
-            const sentMsg = await this.bot.api.sendMessage(
-                chatId,
-                '🔄 *Buffering ended*\n\nTerminal output has not changed for 5 seconds.',
-                { parse_mode: 'Markdown' }
-            );
-
-            // Schedule message deletion at half timeout (like spawning messages)
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await this.bot?.api.deleteMessage(chatId, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete buffering ended message:', error);
-                    }
-                }, deleteTimeout / 2);
-            }
-        } catch (error) {
-            console.error('Failed to send buffering ended notification:', error);
-        }
-    }
-
     private async handleNumberKey(number: string, ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
         const chatId = ctx.chat!.id;
@@ -281,7 +250,7 @@ export class XtermBot {
                 userId,
                 chatId,
                 undefined,
-                this.handleBufferingEnded.bind(this)
+                undefined
             );
 
             // Update command menu to show /close instead of AI assistants
