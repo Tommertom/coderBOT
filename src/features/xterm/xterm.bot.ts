@@ -213,14 +213,19 @@ export class XtermBot {
 
             // Schedule message deletion at half timeout (like spawning messages)
             const deleteTimeout = this.configService.getMessageDeleteTimeout();
+            console.log(`[DEBUG] Message delete timeout: ${deleteTimeout}ms, will delete in ${deleteTimeout / 2}ms`);
             if (deleteTimeout > 0) {
                 setTimeout(async () => {
                     try {
+                        console.log(`[DEBUG] Attempting to delete buffering ended message ${sentMsg.message_id}`);
                         await this.bot?.api.deleteMessage(chatId, sentMsg.message_id);
+                        console.log(`[DEBUG] Successfully deleted buffering ended message ${sentMsg.message_id}`);
                     } catch (error) {
                         console.error('Failed to delete buffering ended message:', error);
                     }
                 }, deleteTimeout / 2);
+            } else {
+                console.log(`[DEBUG] Message deletion disabled (timeout = ${deleteTimeout})`);
             }
         } catch (error) {
             console.error('Failed to send buffering ended notification:', error);

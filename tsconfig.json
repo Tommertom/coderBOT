@@ -5,11 +5,13 @@
     "target": "ES2020",
     "moduleResolution": "node",
     "sourceMap": true,
+    "rootDir": "src",
     "outDir": "dist",
     "lib": ["ES2020", "dom"],
     "types": ["node"],
     "downlevelIteration": true,
     "skipLibCheck": true
   },
-  "exclude": ["scripts/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["scripts/**/*", "tests/**/*"]
 }
