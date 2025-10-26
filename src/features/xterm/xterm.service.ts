@@ -260,11 +260,8 @@ export class XtermService {
     private startBufferMonitoring(userId: string): void {
         const session = this.sessions.get(this.getSessionKey(userId));
         if (!session) {
-            console.log(`[DEBUG] startBufferMonitoring: No session found for user ${userId}`);
             return;
         }
-
-        console.log(`[DEBUG] Starting buffer monitoring for user ${userId}`);
 
         // Check buffer every second
         session.bufferMonitorInterval = setInterval(() => {
@@ -273,30 +270,22 @@ export class XtermService {
 
             // Check if buffer has changed since last check
             if (currentBuffer !== session.lastBufferSnapshot) {
-                const bufferLength = currentBuffer.length;
-                const previousLength = session.lastBufferSnapshot?.length || 0;
-                console.log(`[DEBUG] Buffer changed for user ${userId}: ${previousLength} -> ${bufferLength} chars`);
                 session.lastBufferSnapshot = currentBuffer;
                 session.lastBufferChangeTime = now;
             } else {
                 // Buffer hasn't changed - check if 5 seconds have passed
                 const timeSinceLastChange = now.getTime() - (session.lastBufferChangeTime?.getTime() || 0);
-                console.log(`[DEBUG] Buffer unchanged for user ${userId}: ${timeSinceLastChange}ms since last change`);
 
                 if (timeSinceLastChange >= 5000) {
-                    console.log(`[DEBUG] Buffer stable for 5+ seconds, triggering callback for user ${userId}`);
                     // Buffer hasn't changed for 5 seconds
                     if (session.onBufferingEndedCallback) {
                         session.onBufferingEndedCallback(userId, session.chatId);
-                    } else {
-                        console.log(`[DEBUG] No callback registered for user ${userId}`);
                     }
 
                     // Clear the interval to prevent repeated notifications
                     if (session.bufferMonitorInterval) {
                         clearInterval(session.bufferMonitorInterval);
                         session.bufferMonitorInterval = undefined;
-                        console.log(`[DEBUG] Stopped buffer monitoring for user ${userId}`);
                     }
                 }
             }
