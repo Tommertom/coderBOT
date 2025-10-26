@@ -40,7 +40,7 @@ Commands have been reorganized between the Coder Bot and Xterm Bot to better ali
 1. `/xterm` - Start raw bash terminal
 2. `/copilot` - Start GitHub Copilot AI session
 3. `/claude` - Start Claude AI session
-4. `/gemini` - Start Cursor AI session
+4. `/gemini` - Start Gemini AI session
 5. `/send` - Send text with Enter
 6. `/keys` - Send text without Enter
 7. `/tab` - Send Tab character
@@ -97,7 +97,7 @@ Commands have been reorganized between the Coder Bot and Xterm Bot to better ali
 **File**: `src/features/xterm/xterm.bot.ts`
 
 - Added `handleAIAssistant()` generic method
-- Added `handleCopilot()`, `handleClaude()`, `handleCursor()` methods
+- Added `handleCopilot()`, `handleClaude()`, `handleGemini()` methods
 - Removed `handleClose()` method
 - AI assistants now run without data handlers (no BEL/confirmation monitoring in xterm context)
 
@@ -146,7 +146,7 @@ The mycommands menu shows:
 - `/ctrlc` - Send Ctrl+C (interrupt)
 - `/copilot` - Start session with GitHub Copilot ⬅️ Visible
 - `/claude` - Start session with Claude AI ⬅️ Visible
-- `/gemini` - Start session with Cursor AI ⬅️ Visible
+- `/gemini` - Start session with Gemini AI ⬅️ Visible
 - `/start` - Show help message
 
 **Note:** `/close` is NOT shown when there's no active session.

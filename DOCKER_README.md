@@ -165,7 +165,7 @@ The docker-compose.yml uses `npx @tommertom/coderbot` to run the latest publishe
 - GitHub Copilot CLI (via `@github/copilot`)
 - Claude AI (via `@anthropic-ai/claude-code`)
 - Google Gemini (configure API key)
-- Cursor and other CLI-based AI tools
+- Gemini and other CLI-based AI tools
 
 ## Configuration
 

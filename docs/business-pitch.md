@@ -4,7 +4,7 @@
 
 Modern developers face a critical productivity challenge:
 
-- **AI coding assistants are powerful** - GitHub Copilot CLI, Claude AI, Google Gemini, and Cursor can dramatically accelerate development
+- **AI coding assistants are powerful** - GitHub Copilot CLI, Claude AI, Google Gemini, and Gemini can dramatically accelerate development
 - **But they're trapped on your desktop** - You can't access them when you're away from your workstation
 - **Remote development is clunky** - SSH, VPNs, and desktop remoting are slow, complex, and often blocked on mobile networks
 - **Collaboration is fragmented** - Sharing terminal sessions and outputs requires screenshots, copy-paste, and screen sharing tools
@@ -14,7 +14,7 @@ Modern developers face a critical productivity challenge:
 
 **VibeShip transforms Telegram into your personal, AI-powered development terminal.**
 
-Using your personal coderBOT (your automated coding assistant), you get instant access to your full development environment, complete with GitHub Copilot CLI, Claude AI, Google Gemini, Cursor CLI, or any command-line tool - directly from your phone, anywhere in the world.
+Using your personal coderBOT (your automated coding assistant), you get instant access to your full development environment, complete with GitHub Copilot CLI, Claude AI, Google Gemini, Gemini CLI, or any command-line tool - directly from your phone, anywhere in the world.
 
 ## Why VibeShip is a Game-Changer
 
@@ -30,7 +30,7 @@ Using your personal coderBOT (your automated coding assistant), you get instant 
 - GitHub Copilot CLI at your fingertips
 - Claude AI for complex problem-solving
 - Google Gemini for multimodal AI assistance
-- Cursor CLI integration for intelligent coding
+- Gemini CLI integration for intelligent coding
 - Full terminal access for any CLI tool you use
 
 **Real Productivity Gains**

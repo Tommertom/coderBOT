@@ -155,7 +155,7 @@ The commands have been reorganized between the two bots:
 - `/xterm` - Start raw bash terminal
 - `/copilot` - Start GitHub Copilot session (moved from coder)
 - `/claude` - Start Claude AI session (moved from coder)
-- `/gemini` - Start Cursor AI session (moved from coder)
+- `/gemini` - Start Gemini AI session (moved from coder)
 - `/send` - Send text with Enter
 - `/keys` - Send text without Enter
 - `/tab` - Send Tab

@@ -3,13 +3,13 @@
 [![npm version](https://badge.fury.io/js/@tommertom%2Fcoderbot.svg)](https://www.npmjs.com/package/@tommertom/coderbot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A Telegram bot that provides interactive terminal sessions with support for AI coding assistants (GitHub Copilot CLI, Claude AI, Google Gemini, Cursor, or any CLI-based AI tool). Run it instantly with `npx` or install it globally.
+A Telegram bot that provides interactive terminal sessions with support for AI coding assistants (GitHub Copilot CLI, Claude AI, Google Gemini, Gemini, or any CLI-based AI tool). Run it instantly with `npx` or install it globally.
 
 **Powered by the best AI coding assistants:**
 - 🤖 **GitHub Copilot CLI** - GitHub's AI pair programmer
 - 🧠 **Claude AI** - Anthropic's advanced AI assistant
 - ✨ **Google Gemini** - Google's multimodal AI model
-- 🎯 **Cursor** - AI-first code editor CLI
+- 🎯 **Gemini** - AI-first code editor CLI
 - 🔧 **Any CLI tool** - Works with any command-line AI assistant
 
 ## Quick Start
@@ -40,7 +40,7 @@ coderbot
 ## Features
 
 - 🖥️ **Interactive Terminal**: Full xterm terminal access via Telegram with PTY support
-- 🤖 **AI Coding Assistant Support**: Native integration with GitHub Copilot CLI, Claude AI, Google Gemini, Cursor CLI, or any command-line AI tool
+- 🤖 **AI Coding Assistant Support**: Native integration with GitHub Copilot CLI, Claude AI, Google Gemini, Gemini CLI, or any command-line AI tool
 - 🔐 **Robust Access Control**: Environment-based user authentication with optional auto-kill on unauthorized access
 - 📸 **Terminal Screenshots**: Real-time visual feedback with terminal screen captures using Puppeteer
 - 📁 **Media File Watcher**: Automatically send generated files (images, videos, documents) to users
@@ -255,7 +255,7 @@ code .env
 
 ### Prerequisites: Authenticating AI Coding Tools
 
-**Important:** Before you can use the AI coding assistants (`/copilot`, `/claude`, `/gemini`, `/cursor`), you must first authenticate these tools on the server where the bot is running.
+**Important:** Before you can use the AI coding assistants (`/copilot`, `/claude`, `/gemini`, `/gemini`), you must first authenticate these tools on the server where the bot is running.
 Do this by manually running each tool in a terminal to complete their authentication flow.
 Include authentication for Git and GitHub CLI as well, since most AI tools depend on them.
 
@@ -263,7 +263,7 @@ Include authentication for Git and GitHub CLI as well, since most AI tools depen
 - **GitHub Copilot CLI** - Requires GitHub CLI (`gh`) authentication and Copilot subscription
 - **Claude AI** - Requires Anthropic API key or Claude CLI authentication
 - **Google Gemini** - Requires Google AI Studio API key or Gemini CLI authentication
-- **Cursor CLI** - Requires Cursor IDE installation and authentication
+- **Gemini CLI** - Requires Gemini IDE installation and authentication
 
 ## Commands
 
@@ -272,7 +272,7 @@ Include authentication for Git and GitHub CLI as well, since most AI tools depen
 - `/copilot [directory]` - Start session with GitHub Copilot CLI
 - `/claude [directory]` - Start session with Claude AI
 - `/gemini [directory]` - Start session with Google Gemini
-- `/cursor [directory]` - Start session with Cursor CLI
+- `/gemini [directory]` - Start session with Gemini CLI
   - **Optional**: Provide a directory path to cd into before starting the AI assistant
   - Example: `/copilot /home/user/myproject`
 - `/xterm` - Start raw bash terminal session (no AI assistant)
@@ -621,7 +621,7 @@ The directories are automatically created on bot startup if they don't exist.
 **Issue**: Commands not working or "No active session" error
 
 **Solutions**:
-1. Start a session first: `/copilot`, `/claude`, `/cursor`, or `/xterm`
+1. Start a session first: `/copilot`, `/claude`, `/gemini`, or `/xterm`
 2. Check if session timed out (see `XTERM_SESSION_TIMEOUT`)
 3. Close and restart session: `/close` then start new session
 4. Check logs for session errors
@@ -695,20 +695,20 @@ The directories are automatically created on bot startup if they don't exist.
 
 ### AI Assistant Not Starting
 
-**Issue**: `/copilot`, `/claude`, `/gemini`, or `/cursor` command doesn't start the AI
+**Issue**: `/copilot`, `/claude`, `/gemini`, or `/gemini` command doesn't start the AI
 
 **Solutions**:
 1. Ensure the CLI tool is installed on the system:
    - GitHub Copilot: `gh copilot --version` or `copilot --version`
    - Claude: `claude --version`
    - Google Gemini: `gemini --version` or check your installation method
-   - Cursor: `cursor --version`
+   - Gemini: `gemini --version`
 2. Check if CLI tool is in PATH
 3. Verify CLI tool authentication is configured:
    - Copilot: `gh auth status`
    - Claude: Check API key in environment or config
    - Gemini: Check Google AI API key configuration
-   - Cursor: Verify Cursor CLI authentication
+   - Gemini: Verify Gemini CLI authentication
 4. Try `/xterm` then manually start the tool to see error messages
 5. Check terminal output for authentication or configuration errors
 

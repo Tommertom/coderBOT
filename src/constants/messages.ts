@@ -20,6 +20,7 @@ export const Messages = {
     // Status messages
     REFRESHING: '🔄 Refreshing...',
     CAPTURING_SCREEN: '📸 Capturing terminal screen...',
+    SPAWNING_SESSION: '🚀 Spawning now...',
 } as const;
 
 /**

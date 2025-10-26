@@ -31,7 +31,7 @@ Successfully implemented a feature that allows users to store startup prompts (m
    - Returns early (doesn't send to terminal)
    
 5. **handleAIAssistant**: Added startup prompt sending logic
-   - Only applies to `copilot` type (not `claude` or `cursor`)
+   - Only applies to `copilot` type (not `claude` or `gemini`)
    - Waits 3 seconds after session creation
    - Loads prompt from storage
    - Sends the entire message unmodified (including `./cwd` prefix)

@@ -276,11 +276,24 @@ export class XtermBot {
                 return;
             }
 
+            // Send spawning message with half timeout deletion
+            const spawningMsg = await ctx.reply(Messages.SPAWNING_SESSION);
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
+            if (deleteTimeout > 0) {
+                setTimeout(async () => {
+                    try {
+                        await ctx.api.deleteMessage(chatId, spawningMsg.message_id);
+                    } catch (error) {
+                        console.error('Failed to delete spawning message:', error);
+                    }
+                }, deleteTimeout / 2);
+            }
+
             // Create session with URL notification callback if enabled
             this.xtermService.createSession(
-                userId, 
-                chatId, 
-                undefined, 
+                userId,
+                chatId,
+                undefined,
                 this.handleUrlDiscovered.bind(this)
             );
 
@@ -580,7 +593,7 @@ export class XtermBot {
     }
 
     /**
-     * Generic handler for AI assistant commands (copilot, claude, cursor)
+     * Generic handler for AI assistant commands (copilot, claude, gemini)
      */
     private async handleAIAssistant(
         ctx: Context,
@@ -596,11 +609,24 @@ export class XtermBot {
                 return;
             }
 
+            // Send spawning message with half timeout deletion
+            const spawningMsg = await ctx.reply(Messages.SPAWNING_SESSION);
+            const deleteTimeout = this.configService.getMessageDeleteTimeout();
+            if (deleteTimeout > 0) {
+                setTimeout(async () => {
+                    try {
+                        await ctx.api.deleteMessage(chatId, spawningMsg.message_id);
+                    } catch (error) {
+                        console.error('Failed to delete spawning message:', error);
+                    }
+                }, deleteTimeout / 2);
+            }
+
             // Create session with URL notification callback if enabled
             this.xtermService.createSession(
-                userId, 
-                chatId, 
-                undefined, 
+                userId,
+                chatId,
+                undefined,
                 this.handleUrlDiscovered.bind(this)
             );
 
@@ -693,7 +719,7 @@ export class XtermBot {
                         reply_markup: keyboard,
                     });
                 }
-                
+
                 // Trigger auto-refresh interval
                 this.triggerAutoRefresh(userId, chatId);
                 return;

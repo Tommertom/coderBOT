@@ -396,7 +396,7 @@ docs/docker-runner-implementation.md (this file)
 
 ### Potential Additions
 - [ ] Support for Claude CLI configuration
-- [ ] Support for Cursor CLI setup
+- [ ] Support for Gemini CLI setup
 - [ ] Multi-bot deployment in single script call
 - [ ] Health check endpoints
 - [ ] Prometheus metrics
