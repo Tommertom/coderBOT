@@ -28,6 +28,9 @@ XTERM_TERMINAL_ROWS=50
 # Terminal dimensions - columns (default: 100)
 XTERM_TERMINAL_COLS=100
 
+# Terminal font size (default: 14)
+XTERM_FONT_SIZE=18
+
 # Shell path for PTY sessions (default: /bin/bash)
 XTERM_SHELL_PATH=/bin/bash
 

@@ -15,6 +15,7 @@ export class ConfigService {
     private readonly xtermSessionTimeout: number;
     private readonly xtermTerminalRows: number;
     private readonly xtermTerminalCols: number;
+    private readonly xtermFontSize: number;
     private readonly xtermShellPath: string;
 
     // Media Configuration
@@ -70,6 +71,7 @@ export class ConfigService {
         this.xtermSessionTimeout = parseInt(process.env.XTERM_SESSION_TIMEOUT || '1800000', 10);
         this.xtermTerminalRows = parseInt(process.env.XTERM_TERMINAL_ROWS || '50', 10);
         this.xtermTerminalCols = parseInt(process.env.XTERM_TERMINAL_COLS || '100', 10);
+        this.xtermFontSize = parseInt(process.env.XTERM_FONT_SIZE || '14', 10);
         this.xtermShellPath = process.env.XTERM_SHELL_PATH || '/bin/bash';
 
         // Load media configuration
@@ -139,6 +141,10 @@ export class ConfigService {
 
     getXtermTerminalCols(): number {
         return this.xtermTerminalCols;
+    }
+
+    getXtermFontSize(): number {
+        return this.xtermFontSize;
     }
 
     getXtermShellPath(): string {

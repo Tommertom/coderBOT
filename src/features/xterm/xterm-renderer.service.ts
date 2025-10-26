@@ -1,9 +1,15 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
+import { ConfigService } from '../../services/config.service.js';
 
 export class XtermRendererService {
     private browser: Browser | null = null;
     private page: Page | null = null;
     private isInitialized: boolean = false;
+    private configService: ConfigService;
+
+    constructor(configService: ConfigService) {
+        this.configService = configService;
+    }
 
     async initialize(): Promise<void> {
         if (this.isInitialized) {
@@ -73,8 +79,9 @@ export class XtermRendererService {
 
         try {
             const terminalContent = output.join('');
+            const fontSize = this.configService.getXtermFontSize();
 
-            await this.page.evaluate((content: string, r: number, c: number) => {
+            await this.page.evaluate((content: string, r: number, c: number, fontSize: number) => {
                 const terminalDiv = document.getElementById('terminal');
                 if (terminalDiv) {
                     terminalDiv.innerHTML = '';
@@ -85,7 +92,7 @@ export class XtermRendererService {
                     cols: c,
                     cursorBlink: false,
                     fontFamily: 'Courier New, monospace',
-                    fontSize: 14,
+                    fontSize: fontSize,
                     theme: {
                         background: '#000000',
                         foreground: '#ffffff',
@@ -97,7 +104,7 @@ export class XtermRendererService {
                 term.write(content);
 
                 (window as any).currentTerminal = term;
-            }, terminalContent, rows, cols);
+            }, terminalContent, rows, cols, fontSize);
 
             await new Promise(resolve => setTimeout(resolve, 500));
 
