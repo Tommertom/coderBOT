@@ -132,8 +132,8 @@ export class CoderService {
             }
 
             const coderWantsInteraction = data.includes('1. Y');
-
             if (coderWantsInteraction && handlers.onConfirmationPrompt) {
+                console.log('YES detected')
                 handlers.onConfirmationPrompt(userId, chatId, 'Select option');
             }
 

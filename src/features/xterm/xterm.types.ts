@@ -9,6 +9,7 @@ export interface PtySession {
     chatId: number;
     onDataCallback?: (userId: string, chatId: number, data: string) => void;
     lastScreenshotMessageId?: number;
+    lastScreenshotBufferHash?: string;
     refreshInterval?: NodeJS.Timeout;
     lastBufferSnapshot?: string;
     lastBufferChangeTime?: Date;

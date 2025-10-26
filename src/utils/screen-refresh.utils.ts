@@ -103,6 +103,9 @@ export class ScreenRefreshUtils {
                     reply_markup: keyboard,
                 });
 
+                // Update the session's buffer hash to keep it in sync
+                xtermService.setLastScreenshotBufferHash(userId, currentBufferHash);
+
             } catch (error) {
                 console.error(`Failed to auto-refresh screen for user ${userId}:`, error);
             }

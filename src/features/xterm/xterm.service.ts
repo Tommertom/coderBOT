@@ -206,6 +206,18 @@ export class XtermService {
         }
     }
 
+    setLastScreenshotBufferHash(userId: string, hash: string): void {
+        const session = this.sessions.get(this.getSessionKey(userId));
+        if (session) {
+            session.lastScreenshotBufferHash = hash;
+        }
+    }
+
+    getLastScreenshotBufferHash(userId: string): string | undefined {
+        const session = this.sessions.get(this.getSessionKey(userId));
+        return session?.lastScreenshotBufferHash;
+    }
+
     private startBufferMonitoring(userId: string): void {
         const session = this.sessions.get(this.getSessionKey(userId));
         if (!session) {

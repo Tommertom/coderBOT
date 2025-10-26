@@ -32,6 +32,7 @@ export class CoderBot {
     private configService: ConfigService;
     private startupPromptService: StartupPromptService;
     private activeAssistantType: AssistantType | null = null;
+    private confirmNotificationDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
 
     constructor(
         botId: string,
@@ -142,8 +143,17 @@ export class CoderBot {
             const lastMessageId = this.xtermService.getLastScreenshotMessageId(userId);
 
             if (lastMessageId) {
-                // Update the existing screenshot
+                // Get current buffer and check if it has changed
                 const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
+                const currentBufferHash = outputBuffer.join('');
+                const lastBufferHash = this.xtermService.getLastScreenshotBufferHash(userId);
+
+                // Skip update if buffer hasn't changed since last screenshot
+                if (lastBufferHash !== null && lastBufferHash !== undefined && currentBufferHash === lastBufferHash) {
+                    return;
+                }
+
+                // Update the existing screenshot
                 const dimensions = this.xtermService.getSessionDimensions(userId);
 
                 const imageBuffer = await this.xtermRendererService.renderToImage(
@@ -161,6 +171,9 @@ export class CoderBot {
                     }, {
                         reply_markup: keyboard,
                     });
+
+                    // Update the buffer hash after successful screenshot update
+                    this.xtermService.setLastScreenshotBufferHash(userId, currentBufferHash);
                 } catch (error) {
                     console.error('Failed to update screenshot:', error);
                 }
@@ -170,42 +183,42 @@ export class CoderBot {
         }
     }
 
-    private async handleConfirmNotification(userId: string, chatId: number, data: string): Promise<void> {
+    private async handleConfirmNotification(userId: string, chatId: number, message: string): Promise<void> {
         if (!this.bot) {
             console.error('Bot instance not available for confirmation notification');
             return;
         }
 
-        try {
-            this.handleBellNotification(userId, chatId);
-            const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
-
-            // Check if the terminal output contains the confirmation trigger pattern
-            const fullOutput = outputBuffer.join('');
-
-            if (!fullOutput.includes('> 1.')) {
-                // If the trigger pattern is not found, don't send notification
-                return;
-            }
-
-            // Build message with generic option list
-            const message = '⚠️ Confirmation Required';
-
-            const sentMsg = await this.bot.api.sendMessage(chatId, message);
-
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await this.bot!.api.deleteMessage(chatId, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete confirmation notification message:', error);
-                    }
-                }, deleteTimeout);
-            }
-        } catch (error) {
-            console.error(`Failed to send confirmation notification: ${error}`);
+        // Implement debouncing: clear existing timer if present
+        const existingTimer = this.confirmNotificationDebounceTimers.get(userId);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
         }
+
+        // Set new timer with 5-second debounce
+        const debounceTimer = setTimeout(async () => {
+            try {
+                // we want a beep or whatever we do when a BEL is signalled
+                this.handleBellNotification(userId, chatId);
+                const sentMsg = await this.bot.api.sendMessage(chatId, message);
+
+                // And then send a message
+                const ctx = {
+                    api: this.bot.api,
+                    chat: { id: chatId }
+                } as Context;
+
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+            } catch (error) {
+                console.error(`Failed to send confirmation notification: ${error}`);
+            } finally {
+                // Clean up the timer from the map
+                this.confirmNotificationDebounceTimers.delete(userId);
+            }
+        }, 5000);
+
+        // Store the timer
+        this.confirmNotificationDebounceTimers.set(userId, debounceTimer);
     }
 
     private async handleCallbackQuery(ctx: Context): Promise<void> {
@@ -247,6 +260,10 @@ export class CoderBot {
                     }, {
                         reply_markup: keyboard,
                     });
+
+                    // Update the buffer hash after successful screenshot update
+                    const currentBufferHash = outputBuffer.join('');
+                    this.xtermService.setLastScreenshotBufferHash(userId, currentBufferHash);
                 }
 
                 // Trigger auto-refresh interval
@@ -432,6 +449,10 @@ export class CoderBot {
         });
 
         this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
+
+        // Store the buffer hash to detect changes in future updates
+        const currentBufferHash = outputBuffer.join('');
+        this.xtermService.setLastScreenshotBufferHash(userId, currentBufferHash);
     }
 
     /**
