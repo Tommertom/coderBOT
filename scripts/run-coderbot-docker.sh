@@ -10,18 +10,17 @@
 # - All necessary dependencies
 #
 # Usage:
-#   ./run-coderbot-docker.sh <BOT_TOKEN> <USER_ID> <GITHUB_PAT>
+#   ./run-coderbot-docker.sh <BOT_TOKEN> <USER_ID>
 #
 # Arguments:
 #   BOT_TOKEN    - Telegram bot token(s) from @BotFather (comma-separated for multiple)
 #   USER_ID      - Telegram user ID(s) for access control (comma-separated for multiple)
-#   GITHUB_PAT   - GitHub Personal Access Token for Copilot CLI authentication
 #
 # Examples:
 #   Single bot, single user:
-#     ./run-coderbot-docker.sh "123456:ABC-DEF..." "987654321" "ghp_xxxxx..."
+#     ./run-coderbot-docker.sh "123456:ABC-DEF..." "987654321"
 #   Multiple bots, multiple users:
-#     ./run-coderbot-docker.sh "123:ABC...,456:DEF..." "111,222,333" "ghp_xxxxx..."
+#     ./run-coderbot-docker.sh "123:ABC...,456:DEF..." "111,222,333"
 #
 ###############################################################################
 
@@ -52,26 +51,24 @@ print_error() {
 }
 
 # Validate arguments
-if [ "$#" -ne 3 ]; then
+if [ "$#" -ne 2 ]; then
     print_error "Invalid number of arguments"
     echo ""
-    echo "Usage: $0 <BOT_TOKEN> <USER_ID> <GITHUB_PAT>"
+    echo "Usage: $0 <BOT_TOKEN> <USER_ID>"
     echo ""
     echo "Arguments:"
     echo "  BOT_TOKEN    - Telegram bot token(s) from @BotFather (comma-separated)"
     echo "  USER_ID      - Telegram user ID(s) for access control (comma-separated)"
-    echo "  GITHUB_PAT   - GitHub Personal Access Token for Copilot CLI"
     echo ""
     echo "Examples:"
-    echo "  Single: $0 \"123456:ABC-DEF...\" \"987654321\" \"ghp_xxxxx...\""
-    echo "  Multi:  $0 \"123:ABC...,456:DEF...\" \"111,222,333\" \"ghp_xxxxx...\""
+    echo "  Single: $0 \"123456:ABC-DEF...\" \"987654321\""
+    echo "  Multi:  $0 \"123:ABC...,456:DEF...\" \"111,222,333\""
     exit 1
 fi
 
 # Parse arguments
 BOT_TOKEN="$1"
 USER_ID="$2"
-GITHUB_PAT="$3"
 
 # Get the script's directory to find the project root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -133,9 +130,9 @@ print_success ".env file created"
 print_info "Creating minimal Dockerfile..."
 cat > Dockerfile << 'EOF'
 # Minimal Linux setup with Node.js, GitHub CLI, and GitHub Copilot CLI
-FROM node:20-slim
+FROM node:22-slim
 
-# Install essential packages
+# Install essential packages including build tools for node-pty
 RUN apt-get update && apt-get install -y \
     bash \
     curl \
@@ -144,6 +141,9 @@ RUN apt-get update && apt-get install -y \
     gpg \
     software-properties-common \
     ca-certificates \
+    make \
+    python3 \
+    build-essential \
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \
@@ -181,13 +181,19 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI
-RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
-    gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
-    tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
-    apt-get update && \
-    apt-get install -y gh && \
-    rm -rf /var/lib/apt/lists/*
+RUN (type -p wget >/dev/null || (apt update && apt install wget -y)) \
+    && mkdir -p -m 755 /etc/apt/keyrings \
+    && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    && cat $out | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+    && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && mkdir -p -m 755 /etc/apt/sources.list.d \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt update \
+    && apt install gh -y \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g @github/copilot@latest
+RUN npm install -g npm@latest
 
 # Create working directory
 WORKDIR /app
@@ -199,30 +205,13 @@ COPY .env /app/.env
 RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
-# Authenticate with GitHub using PAT\n\
-echo "$GITHUB_PAT" | gh auth login --with-token\n\
-\n\
-# Install GitHub Copilot CLI via npm\n\
-echo "Installing GitHub Copilot CLI..."\n\
+# Update Copilot CLI\n\
 npm install -g @github/copilot@latest\n\
 \n\
-# Verify installation\n\
-echo "GitHub CLI version:\"\n\
-gh --version\n\
-\n\
-echo "GitHub Copilot CLI installed:\"\n\
-npm list -g @github/copilot || echo "Checking Copilot installation..."\n\
-\n\
-# Run coderBOT using npx\n\
+# Run coderBOT using npx -y latest\n\
 echo "Starting coderBOT..."\n\
-npx @tommertom/coderbot@latest\n\
+npx -y @tommertom/coderbot@latest\n\
 ' > /app/start.sh && chmod +x /app/start.sh
-
-# Set environment variable for GitHub PAT (will be passed at runtime)
-ENV GITHUB_PAT=""
-
-# Expose any necessary ports (if needed)
-# EXPOSE 3000
 
 # Run the startup script
 CMD ["/app/start.sh"]
@@ -241,8 +230,6 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: coderbot-instance
-    environment:
-      - GITHUB_PAT=${GITHUB_PAT}
     volumes:
       - ./logs:/app/logs
       - coderbot-media:/tmp/coderBOT_media
@@ -340,12 +327,13 @@ docker-compose restart
 
 ## GitHub Copilot CLI
 
-The container includes GitHub Copilot CLI. Authentication is handled automatically using the provided PAT token.
+The container includes GitHub Copilot CLI. You will need to authenticate it manually after starting the container.
 
-To test Copilot CLI inside the container:
+To authenticate and test Copilot CLI inside the container:
 
 ```bash
 docker-compose exec coderbot bash
+gh auth login
 gh copilot suggest "how to list files in linux"
 ```
 
@@ -354,10 +342,10 @@ gh copilot suggest "how to list files in linux"
 ### Container won't start
 - Check logs: `docker-compose logs`
 - Verify .env configuration
-- Ensure GitHub PAT is valid
 
 ### Copilot not working
-- Verify PAT has copilot access
+- Authenticate with: `docker-compose exec coderbot gh auth login`
+- Verify your account has Copilot access
 - Check extension installation: `docker-compose exec coderbot gh extension list`
 
 ## Directory Structure
@@ -377,16 +365,22 @@ print_success "README created"
 
 # Summary
 echo ""
-print_success "=== Setup Complete ==="
+print_success "=== Docker Files Created ==="
 echo ""
 print_info "Working directory: $WORK_DIR"
 echo ""
 print_info "Configuration:"
 echo "  Bot Token: ${BOT_TOKEN:0:20}..."
 echo "  User ID: $USER_ID"
-echo "  GitHub PAT: ${GITHUB_PAT:0:10}..."
 echo ""
-print_info "Next steps:"
+print_info "Files created:"
+echo "  - .env (bot configuration)"
+echo "  - Dockerfile (container definition)"
+echo "  - docker-compose.yml (compose configuration)"
+echo "  - run-docker.sh (startup script)"
+echo "  - README.md (documentation)"
+echo ""
+print_info "To start the container:"
 echo "  1. cd $WORK_DIR"
 echo "  2. ./run-docker.sh"
 echo "  3. View logs: docker-compose logs -f"
@@ -394,15 +388,3 @@ echo ""
 print_warning "Note: Keep this terminal output for reference!"
 print_warning "The working directory contains sensitive credentials (.env file)"
 echo ""
-
-# Optional: Automatically start if user wants
-read -p "Do you want to build and start the container now? (y/n) " -n 1 -r
-echo ""
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    print_info "Building and starting container..."
-    ./run-docker.sh
-    echo ""
-    print_success "Container started! View logs with: cd $WORK_DIR && docker-compose logs -f"
-else
-    print_info "Setup complete. Run './run-docker.sh' when ready to start."
-fi

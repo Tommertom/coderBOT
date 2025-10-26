@@ -9,23 +9,20 @@ export class CommandMenuUtils {
         { command: 'copilot', description: 'Start a new terminal session with Copilot' },
         { command: 'claude', description: 'Start a new terminal session with Claude' },
         { command: 'cursor', description: 'Start a new terminal session with Cursor' },
+        { command: 'xterm', description: 'Start a raw terminal session (no AI)' },
         { command: 'screen', description: 'Capture and view terminal screenshot' },
         { command: 'help', description: 'Show complete command reference' },
-        { command: 'tab', description: 'Send Tab character' },
-        { command: 'enter', description: 'Send Enter key' },
-        { command: 'ctrlc', description: 'Send Ctrl+C (interrupt)' },
-
-        { command: 'start', description: 'Show help message with all commands' },
+        { command: 'start', description: 'Show welcome and quick start guide' },
     ];
 
     private static readonly COMMANDS_WITH_SESSION: BotCommand[] = [
         { command: 'screen', description: 'Capture and view terminal screenshot' },
-        { command: 'help', description: 'Show complete command reference' },
+        { command: 'close', description: 'Close the current terminal session' },
         { command: 'tab', description: 'Send Tab character' },
         { command: 'enter', description: 'Send Enter key' },
         { command: 'ctrlc', description: 'Send Ctrl+C (interrupt)' },
-        { command: 'close', description: 'Close the current terminal session' },
-        { command: 'start', description: 'Show help message with all commands' },
+        { command: 'esc', description: 'Send Escape key' },
+        { command: 'help', description: 'Show complete command reference' },
     ];
 
     /**

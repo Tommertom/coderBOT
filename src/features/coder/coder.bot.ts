@@ -523,9 +523,11 @@ export class CoderBot {
             '🤖 *Welcome to coderBOT!*\n\n' +
             'Your AI-powered terminal assistant is ready to help.\n\n' +
             '*Quick Start:*\n' +
-            '/help - Show all available commands\n' +
-            '/esc - Send Escape key\n' +
-            '/close - Close your session\n\n' +
+            '/copilot - Start GitHub Copilot CLI\n' +
+            '/claude - Start Claude AI\n' +
+            '/cursor - Start Cursor AI\n' +
+            '/xterm - Start raw terminal\n' +
+            '/help - Show all available commands\n\n' +
             'Send any message to interact with the terminal.\n\n' +
             'Happy coding! 🚀',
             { parse_mode: 'Markdown' }
@@ -536,21 +538,37 @@ export class CoderBot {
 
     private async handleHelp(ctx: Context): Promise<void> {
         const sentMsg = await ctx.reply(
-            '🤖 *Coder Bot - Complete Command Reference*\n\n' +
-            '*Session Management:*\n' +
+            '🤖 *CoderBOT - Complete Command Reference*\n\n' +
+            '*Starting Sessions:*\n' +
+            '/copilot - Start GitHub Copilot CLI session\n' +
+            '/claude - Start Claude AI session\n' +
+            '/cursor - Start Cursor AI session\n' +
+            '/xterm - Start raw terminal (no AI)\n' +
+            '/startup <prompt> - Set/view auto-startup prompt for /copilot\n' +
             '/close - Close the current terminal session\n\n' +
             '*Sending Text to Terminal:*\n' +
             'Type any message (not starting with /) - Sent directly to terminal with Enter\n' +
             '.command - Send command (dot prefix removed, Enter added automatically)\n' +
             '*Tip:* Use \\[media\\] in your text - it will be replaced with the media directory path\n\n' +
             '*Special Keys:*\n' +
-            '/esc - Send Escape key\n\n' +
+            '/tab - Send Tab character\n' +
+            '/enter - Send Enter key\n' +
+            '/space - Send Space character\n' +
+            '/esc - Send Escape key\n' +
+            '/delete - Send Delete/Backspace key\n' +
+            '/ctrlc - Send Ctrl+C (interrupt)\n' +
+            '/ctrlx - Send Ctrl+X\n' +
+            '/ctrl <char> - Send any Ctrl+ combination (a-z, @, \\[, \\\\, \\], ^, \\_, ?)\n' +
+            '/arrowup - Send Arrow Up key\n' +
+            '/arrowdown - Send Arrow Down key\n' +
+            '/keys <text> - Send text without Enter\n' +
+            '/1, /2, /3, /4, /5 - Send number keys\n\n' +
             '*Viewing Output:*\n' +
             '/screen - Capture and view terminal screenshot\n' +
             '/urls - Show all URLs found in terminal output\n' +
             'Click 🔄 Refresh button on screenshots to update\n\n' +
             '*Media:*\n' +
-            '• Upload photos or files - Automatically saved to received directory and available to the coder agent\n' +
+            '• Upload photos or files - Automatically saved to received directory\n' +
             '• Files copied to \\[media\] directory will be sent to you automatically\n' +
             '• Use \\[media\] in commands - e.g., "cp output.png \\[media\\]" to send files\n' +
             '• The bot watches this directory and sends any new files to you\n\n' +
