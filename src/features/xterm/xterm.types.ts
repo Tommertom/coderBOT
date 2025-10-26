@@ -13,6 +13,10 @@ export interface PtySession {
     discoveredUrls?: Set<string>;
     notifiedUrls?: Set<string>;
     urlNotificationTimeouts?: Map<number, NodeJS.Timeout>;
+    lastBufferSnapshot?: string;
+    lastBufferChangeTime?: Date;
+    bufferMonitorInterval?: NodeJS.Timeout;
+    onBufferingEndedCallback?: (userId: string, chatId: number) => void;
 }
 
 export interface XtermSession {
