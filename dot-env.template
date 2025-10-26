@@ -83,3 +83,9 @@ CONTROL_BOT_ADMIN_IDS=
 # from child bot processes to its own console for debugging and monitoring
 # Set to false to disable verbose console output (default: true)
 VERBOSE_LOGGING=true
+
+
+#
+# CUSTOM ENV - not specific to coderBOT
+# Place here your custom environment variables if needed
+#
