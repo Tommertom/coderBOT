@@ -87,7 +87,6 @@ export class XtermBot {
             bot.command(keyName, AccessControlMiddleware.requireAccess, this.handleSpecialKey.bind(this, keyName));
         });
         bot.command('screen', AccessControlMiddleware.requireAccess, this.handleScreen.bind(this));
-        bot.command('urls', AccessControlMiddleware.requireAccess, this.handleUrls.bind(this));
         bot.command('1', AccessControlMiddleware.requireAccess, this.handleNumberKey.bind(this, '1'));
         bot.command('2', AccessControlMiddleware.requireAccess, this.handleNumberKey.bind(this, '2'));
         bot.command('3', AccessControlMiddleware.requireAccess, this.handleNumberKey.bind(this, '3'));
@@ -158,41 +157,6 @@ export class XtermBot {
             await ctx.answerCallbackQuery({ text });
         } catch (error) {
             console.error('Failed to answer callback query:', error);
-        }
-    }
-
-    /**
-     * Callback for handling newly discovered URLs in terminal output
-     */
-    private async handleUrlDiscovered(userId: string, chatId: number, url: string): Promise<void> {
-        if (!this.bot || !this.configService.isAutoNotifyUrlsEnabled()) {
-            return;
-        }
-
-        try {
-            // Send URL notification message
-            const sentMsg = await this.bot.api.sendMessage(
-                chatId,
-                `\`${url}\``,
-                { parse_mode: 'Markdown' }
-            );
-
-            // Schedule message deletion if timeout is configured
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                const timeout = setTimeout(async () => {
-                    try {
-                        await this.bot?.api.deleteMessage(chatId, sentMsg.message_id);
-                        this.xtermService.clearUrlNotificationTimeout(userId, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete URL notification message:', error);
-                    }
-                }, deleteTimeout);
-
-                this.xtermService.setUrlNotificationTimeout(userId, sentMsg.message_id, timeout);
-            }
-        } catch (error) {
-            console.error('Failed to send URL notification:', error);
         }
     }
 
@@ -321,12 +285,11 @@ export class XtermBot {
                 }, deleteTimeout / 2);
             }
 
-            // Create session with URL notification callback if enabled
+            // Create session with buffering callback
             this.xtermService.createSession(
                 userId,
                 chatId,
                 undefined,
-                this.handleUrlDiscovered.bind(this),
                 this.handleBufferingEnded.bind(this)
             );
 
@@ -435,35 +398,6 @@ export class XtermBot {
                 this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
             } catch (error) {
                 await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.CAPTURE_SCREEN, error));
-            }
-        });
-    }
-
-    private async handleUrls(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-
-        await this.requireActiveSession(ctx, userId, async () => {
-            try {
-                const urls = this.xtermService.getDiscoveredUrls(userId);
-
-                if (urls.length === 0) {
-                    await ctx.reply(
-                        '🔗 *No URLs Found*\n\n' +
-                        'No URLs have been detected in the terminal output yet.',
-                        { parse_mode: 'Markdown' }
-                    );
-                    return;
-                }
-
-                const urlList = urls.map(url => `\`${url}\``).join('\n');
-                const sentMsg = await ctx.reply(
-                    `🔗 *Discovered URLs* (${urls.length})\n\n${urlList}`,
-                    { parse_mode: 'Markdown' }
-                );
-
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-            } catch (error) {
-                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_KEY, error));
             }
         });
     }

@@ -14,6 +14,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
 
+export enum AssistantType {
+    COPILOT = 'copilot',
+    CLAUDE = 'claude',
+    GEMINI = 'gemini'
+}
+
 export class CoderBot {
     private bot: Bot | null = null;
     private botId: string;
@@ -25,6 +31,7 @@ export class CoderBot {
     private coderService: CoderService;
     private configService: ConfigService;
     private startupPromptService: StartupPromptService;
+    private activeAssistantType: AssistantType | null = null;
 
     constructor(
         botId: string,
@@ -74,31 +81,6 @@ export class CoderBot {
         bot.on('message:text', AccessControlMiddleware.requireAccess, this.handleTextMessage.bind(this));
     }
 
-    private async refreshScreen(userId: string, chatId: number): Promise<void> {
-        if (!this.xtermService.hasSession(userId)) {
-            return;
-        }
-
-        try {
-            const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
-            const dimensions = this.xtermService.getSessionDimensions(userId);
-
-            const imageBuffer = await this.xtermRendererService.renderToImage(
-                outputBuffer,
-                dimensions.rows,
-                dimensions.cols
-            );
-
-            const keyboard = ScreenRefreshUtils.createScreenKeyboard();
-
-            await this.bot!.api.sendPhoto(chatId, new InputFile(imageBuffer), {
-                reply_markup: keyboard,
-            });
-        } catch (error) {
-            console.error('Failed to refresh screen:', error);
-        }
-    }
-
     /**
      * Helper method to trigger auto-refresh after sending input to terminal
      */
@@ -137,13 +119,13 @@ export class CoderBot {
                 const timeout = setTimeout(async () => {
                     try {
                         await this.bot?.api.deleteMessage(chatId, sentMsg.message_id);
-                        this.xtermService.clearUrlNotificationTimeout(userId, sentMsg.message_id);
+                        this.coderService.clearUrlNotificationTimeout(userId, sentMsg.message_id);
                     } catch (error) {
                         console.error('Failed to delete URL notification message:', error);
                     }
                 }, deleteTimeout);
 
-                this.xtermService.setUrlNotificationTimeout(userId, sentMsg.message_id, timeout);
+                this.coderService.registerUrlNotificationTimeout(userId, sentMsg.message_id, timeout);
             }
         } catch (error) {
             console.error('Failed to send URL notification:', error);
@@ -223,35 +205,6 @@ export class CoderBot {
             }
         } catch (error) {
             console.error(`Failed to send confirmation notification: ${error}`);
-        }
-    }
-
-    private async handleBoxDetected(userId: string, chatId: number, data: string): Promise<void> {
-        if (!this.bot) {
-            console.error('Bot instance not available for box detection notification');
-            return;
-        }
-
-        try {
-            // Send debug notification to user
-            const message = '🔍 **Box Pattern Detected** (Debug)\n\n' +
-                `Last 100 chars of buffer:\n\`\`\`\n${data.substring(Math.max(0, data.length - 100))}\n\`\`\``;
-
-            const sentMsg = await this.bot.api.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-
-            // Auto-delete after configured timeout
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await this.bot!.api.deleteMessage(chatId, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete box detection notification message:', error);
-                    }
-                }, deleteTimeout);
-            }
-        } catch (error) {
-            console.error(`Failed to send box detection notification: ${error}`);
         }
     }
 
@@ -486,7 +439,7 @@ export class CoderBot {
      */
     private async handleAIAssistant(
         ctx: Context,
-        assistantType: 'copilot' | 'claude' | 'gemini'
+        assistantType: AssistantType
     ): Promise<void> {
         const userId = ctx.from!.id.toString();
         const chatId = ctx.chat!.id;
@@ -501,26 +454,33 @@ export class CoderBot {
             const dataHandler = this.coderService.createTerminalDataHandler({
                 onBell: this.handleBellNotification.bind(this),
                 onConfirmationPrompt: this.handleConfirmNotification.bind(this),
-                onBoxDetected: this.handleBoxDetected.bind(this),
+                onUrlDiscovered: this.handleUrlDiscovered.bind(this),
             });
+
+            // Set buffer getter so CoderService can access full buffer
+            this.coderService.setBufferGetter(this.xtermService.getSessionOutputBuffer.bind(this.xtermService));
 
             this.xtermService.createSession(
                 userId,
                 chatId,
                 dataHandler,
-                this.handleUrlDiscovered.bind(this)
+                undefined, // onBufferingEndedCallback
+                this.xtermService.getSessionOutputBuffer.bind(this.xtermService) // getFullBufferCallback
             );
 
             await new Promise(resolve => setTimeout(resolve, 500));
 
             this.xtermService.writeToSession(userId, assistantType);
 
+            // Set the active assistant type for this session
+            this.activeAssistantType = assistantType;
+
             await new Promise(resolve => setTimeout(resolve, 2000));
 
             await this.sendSessionScreenshot(ctx, userId);
 
             // Load and send startup prompt after 3 seconds (only for copilot)
-            if (assistantType === 'copilot') {
+            if (assistantType === AssistantType.COPILOT) {
                 setTimeout(async () => {
                     try {
                         const startupPrompt = this.startupPromptService.loadPrompt(this.botId);
@@ -543,15 +503,15 @@ export class CoderBot {
     }
 
     private async handleCopilot(ctx: Context): Promise<void> {
-        await this.handleAIAssistant(ctx, 'copilot');
+        await this.handleAIAssistant(ctx, AssistantType.COPILOT);
     }
 
     private async handleClaude(ctx: Context): Promise<void> {
-        await this.handleAIAssistant(ctx, 'claude');
+        await this.handleAIAssistant(ctx, AssistantType.CLAUDE);
     }
 
     private async handleGemini(ctx: Context): Promise<void> {
-        await this.handleAIAssistant(ctx, 'gemini');
+        await this.handleAIAssistant(ctx, AssistantType.GEMINI);
     }
 
     private async handleStartup(ctx: Context): Promise<void> {
@@ -635,6 +595,10 @@ export class CoderBot {
 
             this.xtermService.closeSession(userId);
             this.coderService.clearBuffer(userId, chatId);
+            this.coderService.clearUrlsForUser(userId);
+
+            // Clear the active assistant type
+            this.activeAssistantType = null;
 
             // Update command menu to show AI assistants instead of /close
             if (this.bot) {
@@ -726,7 +690,8 @@ export class CoderBot {
                 return;
             }
 
-            const urls = this.xtermService.getDiscoveredUrls(userId);
+            // Get URLs from CoderService instead of XtermService
+            const urls = this.coderService.getDiscoveredUrls(userId);
 
             if (urls.length === 0) {
                 await ctx.reply(

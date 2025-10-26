@@ -1,21 +1,25 @@
 import { type CoderConfig } from './coder.types.js';
 import { ConfigService } from '../../services/config.service.js';
+import { UrlExtractionUtils } from '../../utils/url-extraction.utils.js';
 import * as path from 'path';
 import * as fs from 'fs';
 
 export interface TerminalDataHandlers {
     onBell?: (userId: string, chatId: number) => void;
     onConfirmationPrompt?: (userId: string, chatId: number, data: string) => void;
-    onBoxDetected?: (userId: string, chatId: number, data: string) => void;
+    onUrlDiscovered?: (userId: string, chatId: number, url: string) => void;
 }
 
 export class CoderService {
     private config: CoderConfig;
     private dataBuffers: Map<string, string> = new Map();
-    private lastBoxDetection: Map<string, number> = new Map();
     private botId: string;
-    private readonly BOX_DETECTION_DEBOUNCE_MS = 5000; // 5 seconds debounce
-    private streamLogPath: string;
+    private getFullBufferCallback?: (userId: string) => string[];
+
+    // URL tracking
+    private discoveredUrls: Map<string, Set<string>> = new Map();
+    private notifiedUrls: Map<string, Set<string>> = new Map();
+    private urlNotificationTimeouts: Map<string, Map<number, NodeJS.Timeout>> = new Map();
 
     constructor(configService: ConfigService, botId: string) {
         this.botId = botId;
@@ -25,17 +29,6 @@ export class CoderService {
             mediaPath,
             receivedPath: path.join(mediaPath, 'received'),
         };
-
-        // Initialize stream.dat log file path
-        this.streamLogPath = '/home/tom/stream.dat';
-
-        // Clear the file on service initialization
-        try {
-            fs.writeFileSync(this.streamLogPath, '', 'utf-8');
-            console.log(`[DEBUG] Stream log initialized at: ${this.streamLogPath}`);
-        } catch (error) {
-            console.error(`[ERROR] Failed to initialize stream log: ${error}`);
-        }
     }
 
     private getBufferKey(userId: string, chatId: number): string {
@@ -57,12 +50,59 @@ export class CoderService {
     clearBuffer(userId: string, chatId: number): void {
         const key = this.getBufferKey(userId, chatId);
         this.dataBuffers.delete(key);
-        this.lastBoxDetection.delete(key);
     }
 
     clearAllBuffers(): void {
         this.dataBuffers.clear();
-        this.lastBoxDetection.clear();
+    }
+
+    setBufferGetter(getFullBuffer: (userId: string) => string[]): void {
+        this.getFullBufferCallback = getFullBuffer;
+    }
+
+    // URL Tracking Methods
+
+    private getUserKey(userId: string): string {
+        return userId;
+    }
+
+    getDiscoveredUrls(userId: string): string[] {
+        const userKey = this.getUserKey(userId);
+        const urls = this.discoveredUrls.get(userKey);
+        return urls ? Array.from(urls) : [];
+    }
+
+    clearUrlsForUser(userId: string): void {
+        const userKey = this.getUserKey(userId);
+        this.discoveredUrls.delete(userKey);
+        this.notifiedUrls.delete(userKey);
+
+        // Clear all timeouts for this user
+        const timeouts = this.urlNotificationTimeouts.get(userKey);
+        if (timeouts) {
+            timeouts.forEach(timeout => clearTimeout(timeout));
+            this.urlNotificationTimeouts.delete(userKey);
+        }
+    }
+
+    registerUrlNotificationTimeout(userId: string, messageId: number, timeout: NodeJS.Timeout): void {
+        const userKey = this.getUserKey(userId);
+        if (!this.urlNotificationTimeouts.has(userKey)) {
+            this.urlNotificationTimeouts.set(userKey, new Map());
+        }
+        this.urlNotificationTimeouts.get(userKey)!.set(messageId, timeout);
+    }
+
+    clearUrlNotificationTimeout(userId: string, messageId: number): void {
+        const userKey = this.getUserKey(userId);
+        const timeouts = this.urlNotificationTimeouts.get(userKey);
+        if (timeouts) {
+            const timeout = timeouts.get(messageId);
+            if (timeout) {
+                clearTimeout(timeout);
+                timeouts.delete(messageId);
+            }
+        }
     }
 
     getMediaPath(): string {
@@ -83,56 +123,44 @@ export class CoderService {
      */
     createTerminalDataHandler(handlers: TerminalDataHandlers): (userId: string, chatId: number, data: string) => void {
         return (userId: string, chatId: number, data: string) => {
-
-            console.log('Handling data', userId, chatId)
-            // Log all received data to stream.dat for debugging
-            try {
-                const timestamp = new Date().toISOString();
-                const dataType = typeof data;
-                const dataLength = data.length;
-                const hexDump = Buffer.from(data, 'utf-8').toString('hex').match(/.{1,2}/g)?.join(' ') || '';
-                const logEntry = `\n=== ${timestamp} ===\n` +
-                    `Type: ${dataType}\n` +
-                    `Length: ${dataLength}\n` +
-                    `Raw: ${JSON.stringify(data)}\n` +
-                    `Display: ${data}\n`;
-
-                fs.appendFileSync(this.streamLogPath, logEntry, 'utf-8');
-            } catch (error) {
-                console.error(`[ERROR] Failed to write to stream log: ${error}`);
-            }
-
             // Append incoming data to buffer for this session
             const buffer = this.appendToBuffer(userId, chatId, data);
-            const sessionKey = this.getBufferKey(userId, chatId);
 
             // Check for BEL character (ASCII 0x07)
             if (data.includes('\x07') && handlers.onBell) {
                 handlers.onBell(userId, chatId);
             }
 
-            // Box detection - check buffer (not just current data chunk) for box drawing characters
-            // Common box patterns: ╭─, ┌─, ┏━, ╔═
-            const boxPatterns = ['╭─', '┌─', '┏━', '╔═', '╭'];
-            const hasBoxPattern = boxPatterns.some(pattern => data.includes(pattern));
+            const coderWantsInteraction = data.includes('1. Y');
 
-            if (hasBoxPattern && handlers.onBoxDetected) {
-                // Debounce: only trigger if enough time has passed since last detection
-                const now = Date.now();
-                const lastDetection = this.lastBoxDetection.get(sessionKey) || 0;
-
-                if (now - lastDetection > this.BOX_DETECTION_DEBOUNCE_MS) {
-                    console.log('[DEBUG] Box pattern detected in buffer:', buffer.substring(Math.max(0, buffer.length - 100)));
-                    this.lastBoxDetection.set(sessionKey, now);
-                    handlers.onBoxDetected(userId, chatId, buffer);
-                }
+            if (coderWantsInteraction && handlers.onConfirmationPrompt) {
+                handlers.onConfirmationPrompt(userId, chatId, 'Select option');
             }
 
-            // Check for Copilot confirmation prompts in the buffered data
-            if (buffer.includes('1. Yes') && handlers.onConfirmationPrompt) {
-                setTimeout(() => {
-                    handlers.onConfirmationPrompt(userId, chatId, buffer);
-                }, 3000);
+            // URL detection
+            if (handlers.onUrlDiscovered) {
+                const urls = UrlExtractionUtils.extractUrlsFromTerminalOutput(data);
+                const userKey = this.getUserKey(userId);
+
+                if (!this.discoveredUrls.has(userKey)) {
+                    this.discoveredUrls.set(userKey, new Set());
+                }
+                if (!this.notifiedUrls.has(userKey)) {
+                    this.notifiedUrls.set(userKey, new Set());
+                }
+
+                const discovered = this.discoveredUrls.get(userKey)!;
+                const notified = this.notifiedUrls.get(userKey)!;
+
+                urls.forEach(url => {
+                    discovered.add(url);
+
+                    // Notify only if not already notified
+                    if (!notified.has(url)) {
+                        notified.add(url);
+                        handlers.onUrlDiscovered!(userId, chatId, url);
+                    }
+                });
             }
         };
     }

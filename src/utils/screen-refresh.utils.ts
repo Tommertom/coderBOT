@@ -33,20 +33,17 @@ export class ScreenRefreshUtils {
         const MAX_REFRESH_COUNT = configService.getScreenRefreshMaxCount();
         // Check if refresh is already running
         if (xtermService.getRefreshInterval(userId)) {
-            console.log(`Auto-refresh already running for user ${userId}, skipping new process`);
             return;
         }
 
         // Check if there's a last screenshot to refresh
         const lastMessageId = xtermService.getLastScreenshotMessageId(userId);
         if (!lastMessageId) {
-            console.log(`No last screenshot found for user ${userId}, skipping auto-refresh`);
             return;
         }
 
         // Check if session exists
         if (!xtermService.hasSession(userId)) {
-            console.log(`No active session for user ${userId}, skipping auto-refresh`);
             return;
         }
 
@@ -68,7 +65,6 @@ export class ScreenRefreshUtils {
                 // If the last message ID changed, someone else triggered a new screen
                 // Stop the auto-refresh as it's no longer relevant
                 if (!currentLastMessageId || currentLastMessageId !== lastMessageId) {
-                    console.log(`Last screenshot changed for user ${userId}, stopping auto-refresh`);
                     xtermService.clearRefreshInterval(userId);
                     return;
                 }
@@ -79,11 +75,8 @@ export class ScreenRefreshUtils {
 
                 // Skip update if buffer hasn't changed
                 if (lastBufferHash !== null && currentBufferHash === lastBufferHash) {
-                    console.log(`Buffer unchanged for user ${userId}, skipping refresh (${refreshCount}/${MAX_REFRESH_COUNT})`);
-
                     // Still count this as a refresh attempt
                     if (refreshCount >= MAX_REFRESH_COUNT) {
-                        console.log(`Completed ${MAX_REFRESH_COUNT} auto-refresh attempts for user ${userId}`);
                         xtermService.clearRefreshInterval(userId);
                     }
                     return;
@@ -110,21 +103,18 @@ export class ScreenRefreshUtils {
                     reply_markup: keyboard,
                 });
 
-                console.log(`Auto-refreshed screen for user ${userId} (${refreshCount}/${MAX_REFRESH_COUNT})`);
             } catch (error) {
                 console.error(`Failed to auto-refresh screen for user ${userId}:`, error);
             }
 
             // Stop after MAX_REFRESH_COUNT refreshes
             if (refreshCount >= MAX_REFRESH_COUNT) {
-                console.log(`Completed ${MAX_REFRESH_COUNT} auto-refreshes for user ${userId}`);
                 xtermService.clearRefreshInterval(userId);
             }
         }, REFRESH_INTERVAL_MS);
 
         // Store the interval in the session
         xtermService.setRefreshInterval(userId, interval);
-        console.log(`Started auto-refresh for user ${userId}`);
     }
 
     /**
@@ -132,6 +122,6 @@ export class ScreenRefreshUtils {
      */
     static stopAutoRefresh(userId: string, xtermService: XtermService): void {
         xtermService.clearRefreshInterval(userId);
-        console.log(`Stopped auto-refresh for user ${userId}`);
+
     }
 }

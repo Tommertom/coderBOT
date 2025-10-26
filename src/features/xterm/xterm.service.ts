@@ -1,7 +1,6 @@
 import * as pty from 'node-pty';
 import { PtySession, XtermConfig } from './xterm.types.js';
 import { ConfigService } from '../../services/config.service.js';
-import { UrlExtractionUtils } from '../../utils/url-extraction.utils.js';
 
 export class XtermService {
     private sessions: Map<string, PtySession> = new Map();
@@ -29,8 +28,8 @@ export class XtermService {
         userId: string,
         chatId: number,
         onDataCallback?: (userId: string, chatId: number, data: string) => void,
-        onUrlDiscoveredCallback?: (userId: string, chatId: number, url: string) => void,
-        onBufferingEndedCallback?: (userId: string, chatId: number) => void
+        onBufferingEndedCallback?: (userId: string, chatId: number) => void,
+        getFullBufferCallback?: (userId: string) => string[]
     ): void {
         const sessionKey = this.getSessionKey(userId);
         if (this.sessions.has(sessionKey)) {
@@ -54,9 +53,6 @@ export class XtermService {
                 cols: this.config.terminalCols,
                 chatId,
                 onDataCallback,
-                discoveredUrls: new Set<string>(),
-                notifiedUrls: new Set<string>(),
-                urlNotificationTimeouts: new Map<number, NodeJS.Timeout>(),
                 lastBufferSnapshot: '',
                 lastBufferChangeTime: new Date(),
                 onBufferingEndedCallback,
@@ -69,18 +65,6 @@ export class XtermService {
                 }
                 session.lastActivity = new Date();
                 // Note: lastBufferChangeTime is managed by startBufferMonitoring()
-
-                // Extract and store URLs from terminal output
-                const urls = UrlExtractionUtils.extractUrlsFromTerminalOutput(data);
-                urls.forEach(url => {
-                    session.discoveredUrls?.add(url);
-
-                    // Notify about new URLs if callback is provided and URL hasn't been notified yet
-                    if (onUrlDiscoveredCallback && !session.notifiedUrls?.has(url)) {
-                        session.notifiedUrls?.add(url);
-                        onUrlDiscoveredCallback(userId, chatId, url);
-                    }
-                });
 
                 // Pass all data to the callback if provided
                 if (session.onDataCallback) {
@@ -177,12 +161,6 @@ export class XtermService {
             clearInterval(session.bufferMonitorInterval);
         }
 
-        // Clear all URL notification timeouts
-        if (session.urlNotificationTimeouts) {
-            session.urlNotificationTimeouts.forEach(timeout => clearTimeout(timeout));
-            session.urlNotificationTimeouts.clear();
-        }
-
         try {
             session.pty.kill();
         } catch (error) {
@@ -225,35 +203,6 @@ export class XtermService {
         if (session?.refreshInterval) {
             clearInterval(session.refreshInterval);
             session.refreshInterval = undefined;
-        }
-    }
-
-    getDiscoveredUrls(userId: string): string[] {
-        const session = this.sessions.get(this.getSessionKey(userId));
-        if (!session?.discoveredUrls) {
-            return [];
-        }
-        return Array.from(session.discoveredUrls);
-    }
-
-    setUrlNotificationTimeout(userId: string, messageId: number, timeout: NodeJS.Timeout): void {
-        const session = this.sessions.get(this.getSessionKey(userId));
-        if (session) {
-            if (!session.urlNotificationTimeouts) {
-                session.urlNotificationTimeouts = new Map<number, NodeJS.Timeout>();
-            }
-            session.urlNotificationTimeouts.set(messageId, timeout);
-        }
-    }
-
-    clearUrlNotificationTimeout(userId: string, messageId: number): void {
-        const session = this.sessions.get(this.getSessionKey(userId));
-        if (session?.urlNotificationTimeouts) {
-            const timeout = session.urlNotificationTimeouts.get(messageId);
-            if (timeout) {
-                clearTimeout(timeout);
-                session.urlNotificationTimeouts.delete(messageId);
-            }
         }
     }
 
