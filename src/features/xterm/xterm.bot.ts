@@ -2,7 +2,6 @@ import { Bot, Context, InputFile, InlineKeyboard } from 'grammy';
 import { XtermService } from './xterm.service.js';
 import { XtermRendererService } from './xterm-renderer.service.js';
 import { ConfigService } from '../../services/config.service.js';
-import { StartupPromptService } from '../../services/startup-prompt.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
 import { MessageUtils } from '../../utils/message.utils.js';
 import { ErrorUtils } from '../../utils/error.utils.js';
@@ -16,7 +15,6 @@ export class XtermBot {
     private xtermService: XtermService;
     private xtermRendererService: XtermRendererService;
     private configService: ConfigService;
-    private startupPromptService: StartupPromptService;
 
     private readonly CTRL_MAPPINGS: Record<string, string> = {
         '@': '\x00',
@@ -54,6 +52,18 @@ export class XtermBot {
         '?': '\x7f',
     };
 
+    private readonly SPECIAL_KEYS: Record<string, { sequence: string; display: string; type: 'special' | 'control' }> = {
+        'tab': { sequence: '\t', display: 'Tab character', type: 'special' },
+        'enter': { sequence: '\r', display: 'Enter key', type: 'special' },
+        'space': { sequence: ' ', display: 'Space character', type: 'special' },
+        'delete': { sequence: '\x7f', display: 'Delete key', type: 'special' },
+        'ctrlc': { sequence: '\x03', display: 'C', type: 'control' },
+        'ctrlx': { sequence: '\x18', display: 'X', type: 'control' },
+        'esc': { sequence: '\x1b', display: 'Escape key', type: 'special' },
+        'arrowup': { sequence: '\x1b[A', display: 'Arrow Up key', type: 'special' },
+        'arrowdown': { sequence: '\x1b[B', display: 'Arrow Down key', type: 'special' },
+    };
+
     constructor(
         botId: string,
         xtermService: XtermService,
@@ -64,27 +74,18 @@ export class XtermBot {
         this.xtermService = xtermService;
         this.xtermRendererService = xtermRendererService;
         this.configService = configService;
-        this.startupPromptService = new StartupPromptService();
     }
 
     registerHandlers(bot: Bot): void {
         this.bot = bot;
         bot.command('xterm', AccessControlMiddleware.requireAccess, this.handleXterm.bind(this));
-        bot.command('copilot', AccessControlMiddleware.requireAccess, this.handleCopilot.bind(this));
-        bot.command('claude', AccessControlMiddleware.requireAccess, this.handleClaude.bind(this));
-        bot.command('gemini', AccessControlMiddleware.requireAccess, this.handleGemini.bind(this));
-        bot.command('startup', AccessControlMiddleware.requireAccess, this.handleStartup.bind(this));
         bot.command('keys', AccessControlMiddleware.requireAccess, this.handleKeys.bind(this));
-        bot.command('tab', AccessControlMiddleware.requireAccess, this.handleTab.bind(this));
-        bot.command('enter', AccessControlMiddleware.requireAccess, this.handleEnter.bind(this));
-        bot.command('space', AccessControlMiddleware.requireAccess, this.handleSpace.bind(this));
-        bot.command('delete', AccessControlMiddleware.requireAccess, this.handleDelete.bind(this));
         bot.command('ctrl', AccessControlMiddleware.requireAccess, this.handleCtrl.bind(this));
-        bot.command('ctrlc', AccessControlMiddleware.requireAccess, this.handleCtrlC.bind(this));
-        bot.command('ctrlx', AccessControlMiddleware.requireAccess, this.handleCtrlX.bind(this));
-        bot.command('esc', AccessControlMiddleware.requireAccess, this.handleEsc.bind(this));
-        bot.command('arrowup', AccessControlMiddleware.requireAccess, this.handleArrowUp.bind(this));
-        bot.command('arrowdown', AccessControlMiddleware.requireAccess, this.handleArrowDown.bind(this));
+
+        // Register all special key handlers using the generic method
+        Object.keys(this.SPECIAL_KEYS).forEach(keyName => {
+            bot.command(keyName, AccessControlMiddleware.requireAccess, this.handleSpecialKey.bind(this, keyName));
+        });
         bot.command('screen', AccessControlMiddleware.requireAccess, this.handleScreen.bind(this));
         bot.command('urls', AccessControlMiddleware.requireAccess, this.handleUrls.bind(this));
         bot.command('1', AccessControlMiddleware.requireAccess, this.handleNumberKey.bind(this, '1'));
@@ -374,142 +375,27 @@ export class XtermBot {
         });
     }
 
-    private async handleTab(ctx: Context): Promise<void> {
+    /**
+     * Generic handler for special keys (tab, enter, space, delete, ctrl+c, ctrl+x, esc, arrows)
+     */
+    private async handleSpecialKey(keyName: string, ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
         const chatId = ctx.chat!.id;
+        const keyConfig = this.SPECIAL_KEYS[keyName];
+
+        if (!keyConfig) {
+            await ctx.reply(`❌ Unknown special key: ${keyName}`);
+            return;
+        }
 
         await this.requireActiveSession(ctx, userId, async () => {
             try {
-                this.xtermService.writeRawToSession(userId, '\t');
-                const sentMsg = await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY('Tab character'));
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-                this.triggerAutoRefresh(userId, chatId);
-            } catch (error) {
-                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TAB, error));
-            }
-        });
-    }
+                this.xtermService.writeRawToSession(userId, keyConfig.sequence);
 
-    private async handleEnter(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
+                const sentMsg = keyConfig.type === 'control'
+                    ? await ctx.reply(SuccessMessages.SENT_CONTROL_KEY(keyConfig.display))
+                    : await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY(keyConfig.display));
 
-        await this.requireActiveSession(ctx, userId, async () => {
-            try {
-                this.xtermService.writeRawToSession(userId, '\r');
-                const sentMsg = await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY('Enter key'));
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-                this.triggerAutoRefresh(userId, chatId);
-            } catch (error) {
-                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_ENTER, error));
-            }
-        });
-    }
-
-    private async handleSpace(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
-
-        await this.requireActiveSession(ctx, userId, async () => {
-            try {
-                this.xtermService.writeRawToSession(userId, ' ');
-                const sentMsg = await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY('Space character'));
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-                this.triggerAutoRefresh(userId, chatId);
-            } catch (error) {
-                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_SPACE, error));
-            }
-        });
-    }
-
-    private async handleDelete(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
-
-        await this.requireActiveSession(ctx, userId, async () => {
-            try {
-                this.xtermService.writeRawToSession(userId, '\x7f');
-                const sentMsg = await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY('Delete key'));
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-                this.triggerAutoRefresh(userId, chatId);
-            } catch (error) {
-                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_DELETE, error));
-            }
-        });
-    }
-
-    private async handleCtrlC(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
-
-        await this.requireActiveSession(ctx, userId, async () => {
-            try {
-                this.xtermService.writeRawToSession(userId, '\x03');
-                const sentMsg = await ctx.reply(SuccessMessages.SENT_CONTROL_KEY('C'));
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-                this.triggerAutoRefresh(userId, chatId);
-            } catch (error) {
-                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_CTRL_C, error));
-            }
-        });
-    }
-
-    private async handleCtrlX(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
-
-        await this.requireActiveSession(ctx, userId, async () => {
-            try {
-                this.xtermService.writeRawToSession(userId, '\x18');
-                const sentMsg = await ctx.reply(SuccessMessages.SENT_CONTROL_KEY('X'));
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-                this.triggerAutoRefresh(userId, chatId);
-            } catch (error) {
-                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_CTRL_X, error));
-            }
-        });
-    }
-
-    private async handleEsc(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
-
-        await this.requireActiveSession(ctx, userId, async () => {
-            try {
-                this.xtermService.writeRawToSession(userId, '\x1b');
-                const sentMsg = await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY('Escape key'));
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-                this.triggerAutoRefresh(userId, chatId);
-            } catch (error) {
-                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_ESCAPE, error));
-            }
-        });
-    }
-
-    private async handleArrowUp(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
-
-        await this.requireActiveSession(ctx, userId, async () => {
-            try {
-                this.xtermService.writeRawToSession(userId, '\x1b[A');
-                const sentMsg = await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY('Arrow Up key'));
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-                this.triggerAutoRefresh(userId, chatId);
-            } catch (error) {
-                await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_KEY, error));
-            }
-        });
-    }
-
-    private async handleArrowDown(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
-
-        await this.requireActiveSession(ctx, userId, async () => {
-            try {
-                this.xtermService.writeRawToSession(userId, '\x1b[B');
-                const sentMsg = await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY('Arrow Down key'));
                 await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
                 this.triggerAutoRefresh(userId, chatId);
             } catch (error) {
@@ -580,137 +466,6 @@ export class XtermBot {
                 await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_KEY, error));
             }
         });
-    }
-
-
-
-    private async handleStartup(ctx: Context): Promise<void> {
-        try {
-            const message = ctx.message?.text || '';
-            const prompt = message.replace('/startup', '').trim();
-
-            if (!prompt) {
-                // Show current startup prompt or help message
-                const currentPrompt = this.startupPromptService.loadPrompt(this.botId);
-                if (currentPrompt) {
-                    await ctx.reply(
-                        `*Current startup prompt for bot ${this.botId}:*\n\n\`${currentPrompt}\`\n\n` +
-                        '*To update:* `/startup <your new prompt>`\n' +
-                        '*To delete:* Use the delete method in the service',
-                        { parse_mode: 'Markdown' }
-                    );
-                } else {
-                    await ctx.reply(
-                        '❌ No startup prompt configured.\n\n' +
-                        '*Usage:* `/startup <prompt>`\n' +
-                        '*Example:* `/startup ./cwd /home/user/project`\n\n' +
-                        'The startup prompt will be automatically sent when launching /copilot.',
-                        { parse_mode: 'Markdown' }
-                    );
-                }
-                return;
-            }
-
-            // Save the startup prompt
-            this.startupPromptService.savePrompt(this.botId, prompt);
-            await ctx.reply(
-                `✅ Startup prompt saved for bot ${this.botId}\n\n` +
-                `*Prompt:* \`${prompt}\`\n\n` +
-                'This message will be sent automatically when launching /copilot.',
-                { parse_mode: 'Markdown' }
-            );
-        } catch (error) {
-            await ctx.reply(ErrorUtils.createErrorMessage('save startup prompt', error));
-        }
-    }
-
-    /**
-     * Generic handler for AI assistant commands (copilot, claude, gemini)
-     */
-    private async handleAIAssistant(
-        ctx: Context,
-        assistantType: 'copilot' | 'claude' | 'gemini'
-    ): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
-
-        try {
-            if (this.xtermService.hasSession(userId)) {
-                const sentMsg = await ctx.reply(Messages.SESSION_ALREADY_EXISTS);
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-                return;
-            }
-
-            // Send spawning message with half timeout deletion
-            const spawningMsg = await ctx.reply(Messages.SPAWNING_SESSION);
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                setTimeout(async () => {
-                    try {
-                        await ctx.api.deleteMessage(chatId, spawningMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete spawning message:', error);
-                    }
-                }, deleteTimeout / 2);
-            }
-
-            // Create session with URL notification callback if enabled
-            this.xtermService.createSession(
-                userId,
-                chatId,
-                undefined,
-                this.handleUrlDiscovered.bind(this),
-                this.handleBufferingEnded.bind(this)
-            );
-
-            // Update command menu to show /close instead of AI assistants
-            if (this.bot) {
-                await CommandMenuUtils.setSessionCommands(this.bot);
-            }
-
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Automatically run the AI assistant command
-            this.xtermService.writeToSession(userId, assistantType);
-
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // Send initial screenshot
-            await this.sendSessionScreenshot(ctx, userId);
-
-            // Load and send startup prompt after 3 seconds (only for copilot)
-            if (assistantType === 'copilot') {
-                setTimeout(async () => {
-                    try {
-                        const startupPrompt = this.startupPromptService.loadPrompt(this.botId);
-                        if (startupPrompt && startupPrompt.trim()) {
-                            // Send the startup prompt to the terminal
-                            this.xtermService.writeRawToSession(userId, startupPrompt);
-                            await new Promise(resolve => setTimeout(resolve, 50));
-                            this.xtermService.writeRawToSession(userId, '\r');
-                            console.log(`Sent startup prompt to copilot for bot ${this.botId}: ${startupPrompt}`);
-                            this.triggerAutoRefresh(userId, chatId);
-                        }
-                    } catch (error) {
-                        console.error(`Failed to send startup prompt for bot ${this.botId}:`, error);
-                    }
-                }, 3000);
-            }
-        } catch (error) {
-            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.START_TERMINAL, error));
-        }
-    }
-
-    private async handleCopilot(ctx: Context): Promise<void> {
-        await this.handleAIAssistant(ctx, 'copilot');
-    }
-
-    private async handleClaude(ctx: Context): Promise<void> {
-        await this.handleAIAssistant(ctx, 'claude');
-    }
-
-    private async handleGemini(ctx: Context): Promise<void> {
-        await this.handleAIAssistant(ctx, 'gemini');
     }
 
     private async handleCallbackQuery(ctx: Context): Promise<void> {

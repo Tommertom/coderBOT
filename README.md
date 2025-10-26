@@ -130,6 +130,17 @@ SCREEN_REFRESH_MAX_COUNT=5
 # Check interval in milliseconds (default: 300000 = 5 minutes)
 # Set to 0 to disable monitoring
 BOT_TOKEN_MONITOR_INTERVAL=300000
+
+# ControlBOT Configuration (Optional)
+# Administrative bot for managing worker bot processes
+CONTROL_BOT_TOKEN=your_control_bot_token
+CONTROL_BOT_ADMIN_IDS=your_telegram_user_id
+
+# Verbose Logging (Optional)
+# When enabled, the ControlBOT parent process will forward all console output
+# (stdout/stderr) from child bot processes to its own console (default: true)
+# Set to false to reduce console noise and only keep logs internally
+VERBOSE_LOGGING=true
 ```
 
 **Finding Your Telegram User ID:**

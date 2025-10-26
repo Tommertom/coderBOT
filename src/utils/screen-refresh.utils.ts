@@ -51,6 +51,7 @@ export class ScreenRefreshUtils {
         }
 
         let refreshCount = 0;
+        let lastBufferHash: string | null = null;
 
         const interval = setInterval(async () => {
             refreshCount++;
@@ -63,7 +64,7 @@ export class ScreenRefreshUtils {
                 }
 
                 const currentLastMessageId = xtermService.getLastScreenshotMessageId(userId);
-                
+
                 // If the last message ID changed, someone else triggered a new screen
                 // Stop the auto-refresh as it's no longer relevant
                 if (!currentLastMessageId || currentLastMessageId !== lastMessageId) {
@@ -72,8 +73,26 @@ export class ScreenRefreshUtils {
                     return;
                 }
 
-                // Render and update the screenshot
+                // Get current buffer and create a hash to detect changes
                 const outputBuffer = xtermService.getSessionOutputBuffer(userId);
+                const currentBufferHash = outputBuffer.join('');
+
+                // Skip update if buffer hasn't changed
+                if (lastBufferHash !== null && currentBufferHash === lastBufferHash) {
+                    console.log(`Buffer unchanged for user ${userId}, skipping refresh (${refreshCount}/${MAX_REFRESH_COUNT})`);
+
+                    // Still count this as a refresh attempt
+                    if (refreshCount >= MAX_REFRESH_COUNT) {
+                        console.log(`Completed ${MAX_REFRESH_COUNT} auto-refresh attempts for user ${userId}`);
+                        xtermService.clearRefreshInterval(userId);
+                    }
+                    return;
+                }
+
+                // Update hash for next comparison
+                lastBufferHash = currentBufferHash;
+
+                // Render and update the screenshot
                 const dimensions = xtermService.getSessionDimensions(userId);
 
                 const imageBuffer = await xtermRendererService.renderToImage(

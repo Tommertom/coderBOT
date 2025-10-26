@@ -3,6 +3,7 @@ import { XtermService } from '../xterm/xterm.service.js';
 import { XtermRendererService } from '../xterm/xterm-renderer.service.js';
 import { CoderService } from './coder.service.js';
 import { ConfigService } from '../../services/config.service.js';
+import { StartupPromptService } from '../../services/startup-prompt.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
 import { MessageUtils } from '../../utils/message.utils.js';
 import { ErrorUtils } from '../../utils/error.utils.js';
@@ -23,6 +24,7 @@ export class CoderBot {
     private xtermRendererService: XtermRendererService;
     private coderService: CoderService;
     private configService: ConfigService;
+    private startupPromptService: StartupPromptService;
 
     constructor(
         botId: string,
@@ -38,6 +40,7 @@ export class CoderBot {
         this.xtermRendererService = xtermRendererService;
         this.coderService = coderService;
         this.configService = configService;
+        this.startupPromptService = new StartupPromptService();
         this.mediaPath = this.coderService.getMediaPath();
         this.receivedPath = this.coderService.getReceivedPath();
         this.ensureReceivedDirectory();
@@ -56,6 +59,10 @@ export class CoderBot {
 
     registerHandlers(bot: Bot): void {
         this.bot = bot;
+        bot.command('copilot', AccessControlMiddleware.requireAccess, this.handleCopilot.bind(this));
+        bot.command('claude', AccessControlMiddleware.requireAccess, this.handleClaude.bind(this));
+        bot.command('gemini', AccessControlMiddleware.requireAccess, this.handleGemini.bind(this));
+        bot.command('startup', AccessControlMiddleware.requireAccess, this.handleStartup.bind(this));
         bot.command('start', AccessControlMiddleware.requireAccess, this.handleStart.bind(this));
         bot.command('help', AccessControlMiddleware.requireAccess, this.handleHelp.bind(this));
         bot.command('esc', AccessControlMiddleware.requireAccess, this.handleEsc.bind(this));
@@ -228,7 +235,7 @@ export class CoderBot {
         try {
             // Send debug notification to user
             const message = '🔍 **Box Pattern Detected** (Debug)\n\n' +
-                           `Last 100 chars of buffer:\n\`\`\`\n${data.substring(Math.max(0, data.length - 100))}\n\`\`\``;
+                `Last 100 chars of buffer:\n\`\`\`\n${data.substring(Math.max(0, data.length - 100))}\n\`\`\``;
 
             const sentMsg = await this.bot.api.sendMessage(chatId, message, { parse_mode: 'Markdown' });
 
@@ -288,7 +295,7 @@ export class CoderBot {
                         reply_markup: keyboard,
                     });
                 }
-                
+
                 // Trigger auto-refresh interval
                 this.triggerAutoRefresh(userId, chatId);
                 return;
@@ -498,9 +505,9 @@ export class CoderBot {
             });
 
             this.xtermService.createSession(
-                userId, 
-                chatId, 
-                dataHandler, 
+                userId,
+                chatId,
+                dataHandler,
                 this.handleUrlDiscovered.bind(this)
             );
 
@@ -511,6 +518,25 @@ export class CoderBot {
             await new Promise(resolve => setTimeout(resolve, 2000));
 
             await this.sendSessionScreenshot(ctx, userId);
+
+            // Load and send startup prompt after 3 seconds (only for copilot)
+            if (assistantType === 'copilot') {
+                setTimeout(async () => {
+                    try {
+                        const startupPrompt = this.startupPromptService.loadPrompt(this.botId);
+                        if (startupPrompt && startupPrompt.trim()) {
+                            // Send the startup prompt to the terminal
+                            this.xtermService.writeRawToSession(userId, startupPrompt);
+                            await new Promise(resolve => setTimeout(resolve, 50));
+                            this.xtermService.writeRawToSession(userId, '\r');
+                            console.log(`Sent startup prompt to copilot for bot ${this.botId}: ${startupPrompt}`);
+                            this.triggerAutoRefresh(userId, chatId);
+                        }
+                    } catch (error) {
+                        console.error(`Failed to send startup prompt for bot ${this.botId}:`, error);
+                    }
+                }, 3000);
+            }
         } catch (error) {
             await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.START_TERMINAL, error));
         }
@@ -528,7 +554,45 @@ export class CoderBot {
         await this.handleAIAssistant(ctx, 'gemini');
     }
 
+    private async handleStartup(ctx: Context): Promise<void> {
+        try {
+            const message = ctx.message?.text || '';
+            const prompt = message.replace('/startup', '').trim();
 
+            if (!prompt) {
+                // Show current startup prompt or help message
+                const currentPrompt = this.startupPromptService.loadPrompt(this.botId);
+                if (currentPrompt) {
+                    await ctx.reply(
+                        `*Current startup prompt for bot ${this.botId}:*\n\n\`${currentPrompt}\`\n\n` +
+                        '*To update:* `/startup <your new prompt>`\n' +
+                        '*To delete:* Use the delete method in the service',
+                        { parse_mode: 'Markdown' }
+                    );
+                } else {
+                    await ctx.reply(
+                        '❌ No startup prompt configured.\n\n' +
+                        '*Usage:* `/startup <prompt>`\n' +
+                        '*Example:* `/startup ./cwd /home/user/project`\n\n' +
+                        'The startup prompt will be automatically sent when launching /copilot.',
+                        { parse_mode: 'Markdown' }
+                    );
+                }
+                return;
+            }
+
+            // Save the startup prompt
+            this.startupPromptService.savePrompt(this.botId, prompt);
+            await ctx.reply(
+                `✅ Startup prompt saved for bot ${this.botId}\n\n` +
+                `*Prompt:* \`${prompt}\`\n\n` +
+                'This message will be sent automatically when launching /copilot.',
+                { parse_mode: 'Markdown' }
+            );
+        } catch (error) {
+            await ctx.reply(ErrorUtils.createErrorMessage('save startup prompt', error));
+        }
+    }
 
     private async handleEsc(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();

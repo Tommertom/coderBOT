@@ -1,6 +1,7 @@
 import { type CoderConfig } from './coder.types.js';
 import { ConfigService } from '../../services/config.service.js';
 import * as path from 'path';
+import * as fs from 'fs';
 
 export interface TerminalDataHandlers {
     onBell?: (userId: string, chatId: number) => void;
@@ -14,6 +15,7 @@ export class CoderService {
     private lastBoxDetection: Map<string, number> = new Map();
     private botId: string;
     private readonly BOX_DETECTION_DEBOUNCE_MS = 5000; // 5 seconds debounce
+    private streamLogPath: string;
 
     constructor(configService: ConfigService, botId: string) {
         this.botId = botId;
@@ -23,6 +25,17 @@ export class CoderService {
             mediaPath,
             receivedPath: path.join(mediaPath, 'received'),
         };
+
+        // Initialize stream.dat log file path
+        this.streamLogPath = '/home/tom/stream.dat';
+
+        // Clear the file on service initialization
+        try {
+            fs.writeFileSync(this.streamLogPath, '', 'utf-8');
+            console.log(`[DEBUG] Stream log initialized at: ${this.streamLogPath}`);
+        } catch (error) {
+            console.error(`[ERROR] Failed to initialize stream log: ${error}`);
+        }
     }
 
     private getBufferKey(userId: string, chatId: number): string {
@@ -70,6 +83,25 @@ export class CoderService {
      */
     createTerminalDataHandler(handlers: TerminalDataHandlers): (userId: string, chatId: number, data: string) => void {
         return (userId: string, chatId: number, data: string) => {
+
+            console.log('Handling data', userId, chatId)
+            // Log all received data to stream.dat for debugging
+            try {
+                const timestamp = new Date().toISOString();
+                const dataType = typeof data;
+                const dataLength = data.length;
+                const hexDump = Buffer.from(data, 'utf-8').toString('hex').match(/.{1,2}/g)?.join(' ') || '';
+                const logEntry = `\n=== ${timestamp} ===\n` +
+                    `Type: ${dataType}\n` +
+                    `Length: ${dataLength}\n` +
+                    `Raw: ${JSON.stringify(data)}\n` +
+                    `Display: ${data}\n`;
+
+                fs.appendFileSync(this.streamLogPath, logEntry, 'utf-8');
+            } catch (error) {
+                console.error(`[ERROR] Failed to write to stream log: ${error}`);
+            }
+
             // Append incoming data to buffer for this session
             const buffer = this.appendToBuffer(userId, chatId, data);
             const sessionKey = this.getBufferKey(userId, chatId);
@@ -81,14 +113,14 @@ export class CoderService {
 
             // Box detection - check buffer (not just current data chunk) for box drawing characters
             // Common box patterns: ╭─, ┌─, ┏━, ╔═
-            const boxPatterns = ['╭─', '┌─', '┏━', '╔═'];
-            const hasBoxPattern = boxPatterns.some(pattern => buffer.includes(pattern));
-            
+            const boxPatterns = ['╭─', '┌─', '┏━', '╔═', '╭'];
+            const hasBoxPattern = boxPatterns.some(pattern => data.includes(pattern));
+
             if (hasBoxPattern && handlers.onBoxDetected) {
                 // Debounce: only trigger if enough time has passed since last detection
                 const now = Date.now();
                 const lastDetection = this.lastBoxDetection.get(sessionKey) || 0;
-                
+
                 if (now - lastDetection > this.BOX_DETECTION_DEBOUNCE_MS) {
                     console.log('[DEBUG] Box pattern detected in buffer:', buffer.substring(Math.max(0, buffer.length - 100)));
                     this.lastBoxDetection.set(sessionKey, now);

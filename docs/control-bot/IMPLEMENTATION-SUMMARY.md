@@ -104,6 +104,7 @@ Successfully implemented ControlBOT, an administrative bot that provides compreh
 3. **Configuration Templates** (`dot-env.template`)
    - CONTROL_BOT_TOKEN configuration
    - CONTROL_BOT_ADMIN_IDS configuration
+   - VERBOSE_LOGGING configuration (defaults to true)
    - Documentation and examples
 
 4. **Documentation** (`docs/control-bot/`)
@@ -155,6 +156,7 @@ README.md                            (MODIFIED - added ControlBot section)
 - ✅ Process status tracking
 - ✅ Error recovery
 - ✅ Log capture and viewing
+- ✅ Configurable verbose logging for console output
 
 ### Usability
 - ✅ Intuitive command structure
@@ -163,6 +165,7 @@ README.md                            (MODIFIED - added ControlBot section)
 - ✅ Progress indicators
 - ✅ Comprehensive help command
 - ✅ User-friendly output formatting
+- ✅ Optional verbose console logging (defaults to enabled)
 
 ### Maintainability
 - ✅ Clean separation of concerns
@@ -208,6 +211,8 @@ CONTROL_BOT_ADMIN_IDS=123456789,987654321
 ### Optional
 - If `CONTROL_BOT_TOKEN` is not set, ControlBOT simply won't start
 - Worker bots continue to function normally
+- `VERBOSE_LOGGING=true` (default) - Forwards child bot console output to parent
+- `VERBOSE_LOGGING=false` - Keeps console output internal only (still accessible via `/logs`)
 
 ## Usage Example
 

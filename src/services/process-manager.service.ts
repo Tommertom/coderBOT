@@ -71,11 +71,19 @@ export class ProcessManager {
             childProcess.stdout?.on('data', (data: Buffer) => {
                 const logLine = data.toString().trim();
                 this.addLog(botId, `[STDOUT] ${logLine}`);
+                // Forward to parent console only if verbose logging is enabled
+                if (this.configService.isVerboseLoggingEnabled()) {
+                    console.log(`[${botId}] ${logLine}`);
+                }
             });
 
             childProcess.stderr?.on('data', (data: Buffer) => {
                 const logLine = data.toString().trim();
                 this.addLog(botId, `[STDERR] ${logLine}`);
+                // Forward to parent console only if verbose logging is enabled
+                if (this.configService.isVerboseLoggingEnabled()) {
+                    console.error(`[${botId}] ${logLine}`);
+                }
             });
 
             childProcess.on('exit', (code, signal) => {

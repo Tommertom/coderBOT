@@ -22,6 +22,11 @@ CONTROL_BOT_TOKEN=your_control_bot_token_here
 
 # Control Bot Admin IDs (comma-separated)
 CONTROL_BOT_ADMIN_IDS=123456789,987654321
+
+# Verbose Logging (Optional - defaults to true)
+# When enabled, child bot console output is forwarded to parent console
+# Set to false to reduce console noise
+VERBOSE_LOGGING=true
 ```
 
 **To get your Telegram User ID:**
@@ -146,6 +151,28 @@ This will:
 - Unauthorized access attempts are logged
 - Bot tokens are masked in all outputs
 - `.env` file is backed up before modifications
+
+## Verbose Logging
+
+The `VERBOSE_LOGGING` environment variable controls whether child bot process console output (stdout/stderr) is forwarded to the parent ControlBOT process console.
+
+**When enabled (default):**
+- All console logs from worker bots appear in the parent process console
+- Useful for debugging and real-time monitoring
+- Each log line is prefixed with `[bot-N]` for identification
+
+**When disabled:**
+- Console output from worker bots is not forwarded to parent console
+- Logs are still captured internally and accessible via `/logs` command
+- Reduces console noise in production environments
+
+**Example:**
+```env
+VERBOSE_LOGGING=true   # Forward all child bot console output (default)
+VERBOSE_LOGGING=false  # Only keep logs internally, don't forward to console
+```
+
+You can still access all logs via the `/logs` command regardless of this setting.
 
 ## Troubleshooting
 

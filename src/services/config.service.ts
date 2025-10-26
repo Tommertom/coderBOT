@@ -38,6 +38,9 @@ export class ConfigService {
     private readonly controlBotToken: string | undefined;
     private readonly controlBotAdminIds: number[];
 
+    // Verbose Logging Configuration
+    private readonly verboseLogging: boolean;
+
     // System Environment
     private readonly homeDirectory: string;
     private readonly systemEnv: { [key: string]: string };
@@ -97,6 +100,11 @@ export class ConfigService {
             .filter(id => id.length > 0)
             .map(id => parseInt(id, 10))
             .filter(id => !isNaN(id));
+
+        // Load verbose logging configuration (default: true)
+        const verboseLoggingValue = process.env.VERBOSE_LOGGING?.toLowerCase();
+        // Default to true if not set or if explicitly set to 'true' or '1'
+        this.verboseLogging = verboseLoggingValue !== 'false' && verboseLoggingValue !== '0';
 
         // Load system environment
         this.homeDirectory = process.env.HOME || '/tmp';
@@ -181,6 +189,11 @@ export class ConfigService {
 
     hasControlBot(): boolean {
         return !!this.controlBotToken && this.controlBotToken.length > 0;
+    }
+
+    // Verbose Logging Configuration Getter
+    isVerboseLoggingEnabled(): boolean {
+        return this.verboseLogging;
     }
 
     // System Environment Getters

@@ -77,3 +77,9 @@ CONTROL_BOT_TOKEN=
 # Comma-separated list of Telegram User IDs who can use the control bot
 # Example: CONTROL_BOT_ADMIN_IDS=123456789,987654321
 CONTROL_BOT_ADMIN_IDS=
+
+# Verbose Logging (Optional)
+# When enabled, the ControlBOT will forward all console output (stdout/stderr)
+# from child bot processes to its own console for debugging and monitoring
+# Set to false to disable verbose console output (default: true)
+VERBOSE_LOGGING=true
