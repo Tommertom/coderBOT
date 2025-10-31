@@ -1,5 +1,9 @@
 # CoderBot
 
+<p align="center">
+  <img src="docs/assets/coderbot-logo.png" alt="CoderBot Logo" width="200"/>
+</p>
+
 [![npm version](https://badge.fury.io/js/@tommertom%2Fcoderbot.svg)](https://www.npmjs.com/package/@tommertom/coderbot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -49,6 +53,7 @@ coderbot
 - 🎯 **Interactive Menu Support**: Number key support for navigating CLI tool menus
 - 🔗 **Automatic URL Notifications**: URLs detected in terminal output are automatically sent as messages and auto-deleted
 - 🔍 **URL Tracking**: Manually view all discovered URLs with the `/urls` command
+- 📁 **Project Navigation**: Quick directory switching with `/projects` command (lists home directory projects)
 - ⚡ **Quick Commands**: Dot prefix (`.command`) for faster command entry
 - 🎮 **ControlBOT**: Administrative bot for managing worker processes (start/stop bots, add/remove tokens, monitor health)
 
@@ -118,11 +123,13 @@ AUTO_NOTIFY_URLS=true
 
 # Auto-refresh Configuration (Optional)
 # Automatically refresh the last shown terminal screenshot after sending commands
+# The first refresh happens immediately, then subsequent refreshes at the interval
 # Refresh interval in milliseconds (default: 5000 = 5 seconds)
 SCREEN_REFRESH_INTERVAL=5000
 
 # Maximum number of automatic refreshes (default: 5)
-# Total auto-refresh duration = SCREEN_REFRESH_INTERVAL * SCREEN_REFRESH_MAX_COUNT
+# Note: First refresh is immediate, then (MAX_COUNT - 1) more at intervals
+# Total auto-refresh duration ≈ SCREEN_REFRESH_INTERVAL * (SCREEN_REFRESH_MAX_COUNT - 1)
 SCREEN_REFRESH_MAX_COUNT=5
 
 # Bot Token Monitoring (Optional)
@@ -141,6 +148,26 @@ CONTROL_BOT_ADMIN_IDS=your_telegram_user_id
 # (stdout/stderr) from child bot processes to its own console (default: true)
 # Set to false to reduce console noise and only keep logs internally
 VERBOSE_LOGGING=true
+
+# Message Placeholders (Optional)
+# Define text replacements for [m0] through [m9] placeholders in messages
+# When you send a message containing [m0], it will be replaced with the configured value
+# Empty values are ignored and placeholders remain unchanged
+# Example usage:
+#   M0=npm run build
+#   M1=git status
+#   M2=docker-compose up -d
+# Then send: [m0] → expands to: npm run build
+M0=
+M1=
+M2=
+M3=
+M4=
+M5=
+M6=
+M7=
+M8=
+M9=
 ```
 
 **Finding Your Telegram User ID:**
@@ -296,6 +323,7 @@ Include authentication for Git and GitHub CLI as well, since most AI tools depen
 - `/send <text>` - Send text to terminal with Enter
 - `/keys <text>` - Send text without pressing Enter
 - **Tip:** Use `[media]` in your commands - it's replaced with the media directory path
+- **Message Placeholders:** Use `[m0]` through `[m9]` in your messages - they're replaced with configured values from your `.env` file (see Message Placeholders section below)
 
 ### Special Keys
 - `/tab` - Send Tab character
@@ -330,6 +358,8 @@ Common examples:
 ### Viewing Output
 - `/screen` - Capture and view terminal screenshot
 - `/urls` - Show all URLs discovered in terminal output
+- `/projects` - List and select project directories from home directory
+- `/macros` - Show all configured message placeholders (m0-m9) and their values
 - Click **🔄 Refresh** button on screenshots to update the view
 
 ### Administrative
@@ -357,6 +387,77 @@ Bot: 🔗 Discovered URLs (1)
      `http://localhost:3000`
 ```
 URLs persist throughout the session and can be retrieved anytime with `/urls`.
+
+### Project Navigation
+Quickly navigate to project directories in your home folder:
+```
+You: /projects
+Bot: 📁 Select a Project (5)
+     Choose a directory to navigate to:
+     
+     [coderBOT] [myapp]
+     [website] [scripts]
+     [documents]
+     [❌ Cancel]
+```
+- Lists all non-hidden directories in your home directory
+- Click a button to `cd` into that directory
+- Message auto-deletes at default timeout interval
+- Click Cancel to dismiss without action
+
+### Message Placeholders
+Create shortcuts for frequently used commands by configuring `M0` through `M9` in your `.env` file:
+
+**Configuration Example:**
+```env
+M0=copy the generated file(s) to /tmp/coderBOT_media/bot-2
+M1=git status
+M2=docker-compose up -d
+M3=npm test
+M4=git pull origin main
+```
+
+**Usage:**
+```
+You: [m0]
+Bot: ✅ Sent
+     (executes: copy the generated file(s) to /tmp/coderBOT_media/bot-2)
+
+You: First let me check: [m1]
+Bot: ✅ Sent
+     (executes: First let me check: git status)
+
+You: [m0] && [m3]
+Bot: ✅ Sent
+     (executes: copy the generated file(s) to /tmp/coderBOT_media/bot-2 && npm test)
+```
+
+**View Configured Macros:**
+```
+You: /macros
+Bot: ⚙️ Message Placeholders
+
+     [m0] → `copy the generated file(s) to /tmp/coderBOT_media/bot-2`
+     [m1] → `git status`
+     [m2] → `docker-compose up -d`
+     [m3] → `npm test`
+     [m4] → `git pull origin main`
+     [m5] → undefined
+     [m6] → undefined
+     [m7] → undefined
+     [m8] → undefined
+     [m9] → undefined
+```
+
+**Features:**
+- Placeholders are replaced **before** any other processing
+- Multiple placeholders can be used in a single message
+- Same placeholder can appear multiple times in one message
+- Empty or unconfigured placeholders remain unchanged
+- Works with all text messages, including dot commands
+- Replacement happens before `/tmp/coderBOT_media/bot-2` file placeholder replacement
+- Use `/macros` command to view all configured placeholders
+- Requires an active terminal session
 
 ## ControlBOT - Administrative Bot
 

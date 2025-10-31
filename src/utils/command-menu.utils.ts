@@ -11,6 +11,8 @@ export class CommandMenuUtils {
         { command: 'gemini', description: 'Start a new terminal session with Gemini' },
         { command: 'xterm', description: 'Start a raw terminal session (no AI)' },
         { command: 'screen', description: 'Capture and view terminal screenshot' },
+        { command: 'projects', description: 'List and select project directories' },
+        { command: 'macros', description: 'Show configured message placeholders (m0-m9)' },
         { command: 'help', description: 'Show complete command reference' },
         { command: 'close', description: 'Close the current terminal session' },
         { command: 'start', description: 'Show welcome and quick start guide' },
@@ -18,11 +20,13 @@ export class CommandMenuUtils {
 
     private static readonly COMMANDS_WITH_SESSION: BotCommand[] = [
         { command: 'screen', description: 'Capture and view terminal screenshot' },
+        { command: 'esc', description: 'Send Escape key' },
         { command: 'close', description: 'Close the current terminal session' },
+        { command: 'projects', description: 'List and select project directories' },
+        { command: 'macros', description: 'Show configured message placeholders (m0-m9)' },
         { command: 'tab', description: 'Send Tab character' },
         { command: 'enter', description: 'Send Enter key' },
         { command: 'ctrlc', description: 'Send Ctrl+C (interrupt)' },
-        { command: 'esc', description: 'Send Escape key' },
         { command: 'help', description: 'Show complete command reference' },
         { command: 'start', description: 'Show welcome and quick start guide' },
     ];

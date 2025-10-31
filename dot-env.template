@@ -88,6 +88,24 @@ CONTROL_BOT_ADMIN_IDS=
 VERBOSE_LOGGING=true
 
 
+# ============================================================================
+# Message Placeholders (Optional)
+# ============================================================================
+# Define text replacements for [m0] through [m9] placeholders in messages
+# When you send a message containing [m0], it will be replaced with the value of M0
+# Empty values are ignored and the placeholder will remain unchanged
+# Example: M0=npm run build
+M0=copy the generated file(s) to /tmp/coderBOT_media/bot-2
+M1=
+M2=
+M3=
+M4=
+M5=
+M6=
+M7=
+M8=
+M9=
+
 #
 # CUSTOM ENV - not specific to coderBOT
 # Place here your custom environment variables if needed

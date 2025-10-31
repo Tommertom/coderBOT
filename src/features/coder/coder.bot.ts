@@ -4,6 +4,7 @@ import { XtermRendererService } from '../xterm/xterm-renderer.service.js';
 import { CoderService } from './coder.service.js';
 import { ConfigService } from '../../services/config.service.js';
 import { StartupPromptService } from '../../services/startup-prompt.service.js';
+import { CustomCoderService } from '../../services/custom-coder.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
 import { MessageUtils } from '../../utils/message.utils.js';
 import { ErrorUtils } from '../../utils/error.utils.js';
@@ -31,8 +32,10 @@ export class CoderBot {
     private coderService: CoderService;
     private configService: ConfigService;
     private startupPromptService: StartupPromptService;
-    private activeAssistantType: AssistantType | null = null;
+    private customCoderService: CustomCoderService;
+    private activeAssistantType: AssistantType | string | null = null;
     private confirmNotificationDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
+    private registeredCustomCoders: Set<string> = new Set();
 
     constructor(
         botId: string,
@@ -49,6 +52,7 @@ export class CoderBot {
         this.coderService = coderService;
         this.configService = configService;
         this.startupPromptService = new StartupPromptService();
+        this.customCoderService = new CustomCoderService();
         this.mediaPath = this.coderService.getMediaPath();
         this.receivedPath = this.coderService.getReceivedPath();
         this.ensureReceivedDirectory();
@@ -70,6 +74,8 @@ export class CoderBot {
         bot.command('copilot', AccessControlMiddleware.requireAccess, this.handleCopilot.bind(this));
         bot.command('claude', AccessControlMiddleware.requireAccess, this.handleClaude.bind(this));
         bot.command('gemini', AccessControlMiddleware.requireAccess, this.handleGemini.bind(this));
+        bot.command('addcoder', AccessControlMiddleware.requireAccess, this.handleAddCoder.bind(this));
+        bot.command('removecoder', AccessControlMiddleware.requireAccess, this.handleRemoveCoder.bind(this));
         bot.command('startup', AccessControlMiddleware.requireAccess, this.handleStartup.bind(this));
         bot.command('start', AccessControlMiddleware.requireAccess, this.handleStart.bind(this));
         bot.command('help', AccessControlMiddleware.requireAccess, this.handleHelp.bind(this));
@@ -77,9 +83,14 @@ export class CoderBot {
         bot.command('close', AccessControlMiddleware.requireAccess, this.handleClose.bind(this));
         bot.command('killbot', AccessControlMiddleware.requireAccess, this.handleKillbot.bind(this));
         bot.command('urls', AccessControlMiddleware.requireAccess, this.handleUrls.bind(this));
+        bot.command('projects', AccessControlMiddleware.requireAccess, this.handleProjects.bind(this));
+        bot.command('macros', AccessControlMiddleware.requireAccess, this.handleMacros.bind(this));
         bot.on('callback_query:data', AccessControlMiddleware.requireAccess, this.handleCallbackQuery.bind(this));
         bot.on('message:photo', AccessControlMiddleware.requireAccess, this.handlePhoto.bind(this));
         bot.on('message:text', AccessControlMiddleware.requireAccess, this.handleTextMessage.bind(this));
+        
+        // Load and register custom coders on startup
+        this.loadAndRegisterAllCustomCoders();
     }
 
     /**
@@ -271,6 +282,34 @@ export class CoderBot {
                 return;
             }
 
+            // Handle project selection
+            if (callbackData.startsWith('project:')) {
+                const projectDir = callbackData.substring(8);
+                if (projectDir === 'cancel') {
+                    await this.safeAnswerCallbackQuery(ctx, '❌ Cancelled');
+                    if (ctx.callbackQuery?.message) {
+                        await ctx.deleteMessage();
+                    }
+                    return;
+                }
+                
+                if (!this.xtermService.hasSession(userId)) {
+                    await this.safeAnswerCallbackQuery(ctx, Messages.NO_ACTIVE_TERMINAL_SESSION);
+                    return;
+                }
+
+                this.xtermService.writeRawToSession(userId, `cd ${projectDir}`);
+                setTimeout(() => {
+                    this.xtermService.writeRawToSession(userId, '\r');
+                }, 100);
+                await this.safeAnswerCallbackQuery(ctx, `✅ Changed to: ${path.basename(projectDir)}`);
+                if (ctx.callbackQuery?.message) {
+                    await ctx.deleteMessage();
+                }
+                this.triggerAutoRefresh(userId, chatId);
+                return;
+            }
+
             // Handle number key buttons (1, 2 and 3)
             if (callbackData === 'num_1' || callbackData === 'num_2' || callbackData === 'num_3') {
                 if (!this.xtermService.hasSession(userId)) {
@@ -390,7 +429,19 @@ export class CoderBot {
                 return;
             }
 
-            const processedText = this.coderService.replaceMediaPlaceholder(text);
+            // Replace [m0] through [m9] placeholders with configured values
+            let processedText = text;
+            for (let i = 0; i <= 9; i++) {
+                const configValue = this.configService.getMPlaceholder(i);
+                if (configValue) {
+                    const placeholder = `[m${i}]`;
+                    const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+                    processedText = processedText.replace(regex, configValue);
+                }
+            }
+
+            // Replace /tmp/coderBOT_media/bot-2 placeholder with file content
+            processedText = this.coderService.replaceMediaPlaceholder(processedText);
 
             this.xtermService.writeRawToSession(userId, processedText);
 
@@ -398,7 +449,7 @@ export class CoderBot {
 
             this.xtermService.writeRawToSession(userId, '\r');
 
-            const sentMsg = await ctx.reply(`✅ Sent - ${Messages.VIEW_SCREEN_HINT}`);
+            const sentMsg = await ctx.reply(`✅ Sent`);
 
             await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
 
@@ -456,11 +507,11 @@ export class CoderBot {
     }
 
     /**
-     * Generic handler for AI assistant commands (copilot, claude, gemini)
+     * Generic handler for AI assistant commands (copilot, claude, gemini, custom)
      */
     private async handleAIAssistant(
         ctx: Context,
-        assistantType: AssistantType
+        assistantType: AssistantType | string
     ): Promise<void> {
         const userId = ctx.from!.id.toString();
         const chatId = ctx.chat!.id;
@@ -493,6 +544,11 @@ export class CoderBot {
                 this.xtermService.getSessionOutputBuffer.bind(this.xtermService) // getFullBufferCallback
             );
 
+            // Update command menu to show /close instead of AI assistants
+            if (this.bot) {
+                await CommandMenuUtils.setSessionCommands(this.bot);
+            }
+
             await new Promise(resolve => setTimeout(resolve, 500));
 
             this.xtermService.writeToSession(userId, assistantType);
@@ -504,24 +560,25 @@ export class CoderBot {
 
             await this.sendSessionScreenshot(ctx, userId);
 
-            // Load and send startup prompt after 3 seconds (only for copilot)
-            if (assistantType === AssistantType.COPILOT) {
-                setTimeout(async () => {
-                    try {
-                        const startupPrompt = this.startupPromptService.loadPrompt(this.botId);
-                        if (startupPrompt && startupPrompt.trim()) {
-                            // Send the startup prompt to the terminal
-                            this.xtermService.writeRawToSession(userId, startupPrompt);
-                            await new Promise(resolve => setTimeout(resolve, 50));
-                            this.xtermService.writeRawToSession(userId, '\r');
-                            console.log(`Sent startup prompt to copilot for bot ${this.botId}: ${startupPrompt}`);
-                            this.triggerAutoRefresh(userId, chatId);
-                        }
-                    } catch (error) {
-                        console.error(`Failed to send startup prompt for bot ${this.botId}:`, error);
+            // Load and send startup prompt after 3 seconds (for ANY assistant type)
+            setTimeout(async () => {
+                try {
+                    const startupPrompt = this.startupPromptService.loadPrompt(
+                        this.botId,
+                        assistantType as string
+                    );
+                    if (startupPrompt && startupPrompt.trim()) {
+                        // Send the startup prompt to the terminal
+                        this.xtermService.writeRawToSession(userId, startupPrompt);
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                        this.xtermService.writeRawToSession(userId, '\r');
+                        console.log(`Sent startup prompt to ${assistantType} for bot ${this.botId}: ${startupPrompt}`);
+                        this.triggerAutoRefresh(userId, chatId);
                     }
-                }, 3000);
-            }
+                } catch (error) {
+                    console.error(`Failed to send startup prompt for ${assistantType}:`, error);
+                }
+            }, 3000);
         } catch (error) {
             await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.START_TERMINAL, error));
         }
@@ -539,39 +596,250 @@ export class CoderBot {
         await this.handleAIAssistant(ctx, AssistantType.GEMINI);
     }
 
+    /**
+     * Check if command name is reserved
+     */
+    private isReservedCommand(name: string): boolean {
+        const reserved = [
+            'copilot', 'claude', 'gemini',
+            'start', 'help', 'esc', 'close', 'killbot', 'urls', 'startup',
+            'addcoder', 'removecoder'
+        ];
+        return reserved.includes(name.toLowerCase());
+    }
+
+    /**
+     * Handle /addcoder command to create custom AI assistant
+     */
+    private async handleAddCoder(ctx: Context): Promise<void> {
+        const userId = ctx.from!.id.toString();
+        const message = ctx.message?.text || '';
+        const args = message.replace('/addcoder', '').trim().split(/\s+/);
+
+        // Validation
+        if (args.length !== 1 || !args[0]) {
+            await ctx.reply(
+                '❌ Usage: `/addcoder <codername>`\n\n' +
+                'Coder name must be a single lowercase word (a-z only).',
+                { parse_mode: 'Markdown' }
+            );
+            return;
+        }
+
+        const coderName = this.customCoderService.sanitizeCoderName(args[0]);
+        const validation = this.customCoderService.validateCoderName(coderName);
+
+        if (!validation.valid) {
+            await ctx.reply(`❌ ${validation.error}`);
+            return;
+        }
+
+        // Check conflicts with reserved commands
+        if (this.isReservedCommand(coderName)) {
+            await ctx.reply(
+                `❌ "${coderName}" is a reserved command. Choose a different name.`
+            );
+            return;
+        }
+
+        // Check if already exists
+        if (this.customCoderService.hasCustomCoder(userId, coderName)) {
+            await ctx.reply(
+                `❌ Custom coder "/${coderName}" already exists.\n\n` +
+                `Use \`/removecoder ${coderName}\` to remove it first.`,
+                { parse_mode: 'Markdown' }
+            );
+            return;
+        }
+
+        // Save and register
+        try {
+            this.customCoderService.saveCustomCoder(userId, coderName, this.botId);
+            this.registerCustomCoder(coderName, userId);
+            await ctx.reply(
+                `✅ Custom coder "/${coderName}" created successfully!\n\n` +
+                `You can now use \`/${coderName}\` to start a session.`,
+                { parse_mode: 'Markdown' }
+            );
+        } catch (error) {
+            await ctx.reply(ErrorUtils.createErrorMessage('create custom coder', error));
+        }
+    }
+
+    /**
+     * Handle /removecoder command to remove custom AI assistant
+     */
+    private async handleRemoveCoder(ctx: Context): Promise<void> {
+        const userId = ctx.from!.id.toString();
+        const message = ctx.message?.text || '';
+        const args = message.replace('/removecoder', '').trim().split(/\s+/);
+
+        if (args.length !== 1 || !args[0]) {
+            await ctx.reply('❌ Usage: `/removecoder <codername>`', { parse_mode: 'Markdown' });
+            return;
+        }
+
+        // CRITICAL: Use same sanitization as addcoder
+        const coderName = this.customCoderService.sanitizeCoderName(args[0]);
+
+        if (!this.customCoderService.hasCustomCoder(userId, coderName)) {
+            await ctx.reply(
+                `❌ Custom coder "/${coderName}" not found.`,
+                { parse_mode: 'Markdown' }
+            );
+            return;
+        }
+
+        try {
+            const deleted = this.customCoderService.deleteCustomCoder(userId, coderName);
+            if (deleted) {
+                // Note: We don't unregister from bot as other users might have the same coder name
+                this.registeredCustomCoders.delete(coderName);
+                await ctx.reply(
+                    `✅ Custom coder "/${coderName}" removed successfully.`,
+                    { parse_mode: 'Markdown' }
+                );
+            } else {
+                await ctx.reply(`❌ Failed to remove custom coder.`);
+            }
+        } catch (error) {
+            await ctx.reply(ErrorUtils.createErrorMessage('remove custom coder', error));
+        }
+    }
+
+    /**
+     * Register a custom coder command dynamically
+     */
+    private registerCustomCoder(coderName: string, userId: string): void {
+        if (!this.bot) return;
+
+        // Avoid registering the same command multiple times
+        if (this.registeredCustomCoders.has(coderName)) {
+            return;
+        }
+
+        // Create a handler that works like copilot/claude/gemini
+        const handler = async (ctx: Context) => {
+            const currentUserId = ctx.from!.id.toString();
+            
+            // Update last used timestamp
+            if (this.customCoderService.hasCustomCoder(currentUserId, coderName)) {
+                this.customCoderService.updateLastUsed(currentUserId, coderName);
+            }
+            
+            // Spawn terminal session
+            await this.handleAIAssistant(ctx, coderName);
+        };
+
+        this.bot.command(coderName, AccessControlMiddleware.requireAccess, handler);
+        this.registeredCustomCoders.add(coderName);
+        console.log(`Registered custom coder command: /${coderName}`);
+    }
+
+    /**
+     * Load and register all custom coders at startup
+     */
+    private loadAndRegisterAllCustomCoders(): void {
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const customCodersDir = path.join(process.cwd(), 'customcoders');
+
+            if (!fs.existsSync(customCodersDir)) {
+                return;
+            }
+
+            const files = fs.readdirSync(customCodersDir);
+            const coderNames = new Set<string>();
+
+            // Extract unique coder names from all files
+            for (const file of files) {
+                if (file.endsWith('.json') && file !== 'README.md') {
+                    try {
+                        const parts = file.replace('.json', '').split('-');
+                        if (parts.length >= 2) {
+                            // File format: userId-coderName.json
+                            const coderName = parts.slice(1).join('-');
+                            coderNames.add(coderName);
+                        }
+                    } catch (error) {
+                        console.error(`Failed to parse custom coder file ${file}:`, error);
+                    }
+                }
+            }
+
+            // Register each unique coder name
+            coderNames.forEach(coderName => {
+                this.registerCustomCoder(coderName, 'system');
+            });
+
+            console.log(`Loaded ${coderNames.size} custom coder commands`);
+        } catch (error) {
+            console.error('Failed to load custom coders:', error);
+        }
+    }
+
     private async handleStartup(ctx: Context): Promise<void> {
         try {
+            const userId = ctx.from!.id.toString();
             const message = ctx.message?.text || '';
             const prompt = message.replace('/startup', '').trim();
 
+            // Check if session is active
+            if (!this.xtermService.hasSession(userId)) {
+                await ctx.reply(
+                    '❌ No active session.\n\n' +
+                    'Please start a coder first with /copilot, /claude, /gemini, or your custom coder.',
+                    { parse_mode: 'Markdown' }
+                );
+                return;
+            }
+
+            // Get the active assistant type
+            const assistantType = this.activeAssistantType;
+            if (!assistantType) {
+                await ctx.reply('❌ Unable to determine active coder type.');
+                return;
+            }
+
+            // Handle delete
+            if (prompt.toLowerCase() === 'delete') {
+                this.startupPromptService.deletePrompt(this.botId, assistantType as string);
+                await ctx.reply(
+                    `✅ Startup prompt deleted for /${assistantType}`,
+                    { parse_mode: 'Markdown' }
+                );
+                return;
+            }
+
+            // View current prompt
             if (!prompt) {
-                // Show current startup prompt or help message
-                const currentPrompt = this.startupPromptService.loadPrompt(this.botId);
+                const currentPrompt = this.startupPromptService.loadPrompt(this.botId, assistantType as string);
                 if (currentPrompt) {
                     await ctx.reply(
-                        `*Current startup prompt for bot ${this.botId}:*\n\n\`${currentPrompt}\`\n\n` +
-                        '*To update:* `/startup <your new prompt>`\n' +
-                        '*To delete:* Use the delete method in the service',
+                        `*Current startup prompt for /${assistantType}:*\n\n` +
+                        `\`${currentPrompt}\`\n\n` +
+                        '*To update:* `/startup <new prompt>`\n' +
+                        '*To delete:* `/startup delete`',
                         { parse_mode: 'Markdown' }
                     );
                 } else {
                     await ctx.reply(
-                        '❌ No startup prompt configured.\n\n' +
-                        '*Usage:* `/startup <prompt>`\n' +
-                        '*Example:* `/startup ./cwd /home/user/project`\n\n' +
-                        'The startup prompt will be automatically sent when launching /copilot.',
+                        `❌ No startup prompt configured for /${assistantType}.\n\n` +
+                        '*Set one:* `/startup <prompt>`\n' +
+                        '*Example:* `/startup resume`',
                         { parse_mode: 'Markdown' }
                     );
                 }
                 return;
             }
 
-            // Save the startup prompt
-            this.startupPromptService.savePrompt(this.botId, prompt);
+            // Save the prompt
+            this.startupPromptService.savePrompt(this.botId, assistantType as string, prompt);
             await ctx.reply(
-                `✅ Startup prompt saved for bot ${this.botId}\n\n` +
+                `✅ Startup prompt saved for /${assistantType}\n\n` +
                 `*Prompt:* \`${prompt}\`\n\n` +
-                'This message will be sent automatically when launching /copilot.',
+                `This will be sent automatically when launching /${assistantType}`,
                 { parse_mode: 'Markdown' }
             );
         } catch (error) {
@@ -662,14 +930,19 @@ export class CoderBot {
     private async handleHelp(ctx: Context): Promise<void> {
         const sentMsg = await ctx.reply(
             '🤖 *CoderBOT - Complete Command Reference*\n\n' +
-            '*Starting\n Sessions:*\n' +
+            '*Starting Sessions:*\n' +
             '/copilot - Start GitHub Copilot CLI session\n' +
             '/claude - Start Claude AI session\n' +
             '/gemini - Start Gemini AI session\n' +
-            '/xterm - Start raw terminal (no AI)\n' +
-            '/startup <prompt> - Set/view auto-startup prompt for /copilot\n' +
+            '/xterm - Start raw terminal (no AI)\n\n' +
+            '*Custom Coders:*\n' +
+            '/addcoder <name> - Create custom AI assistant (a-z only)\n' +
+            '/removecoder <name> - Remove custom AI assistant\n\n' +
+            '*Session Management:*\n' +
+            '/startup [prompt] - Set/view auto-startup for current coder\n' +
+            '/startup delete - Remove startup prompt\n' +
             '/close - Close the current terminal session\n\n' +
-            '*Sending Coder Commands to Terminal:*\n' +
+            '*Sending Commands to Terminal:*\n' +
             'Type any message (not starting with /) - Sent directly to terminal with Enter\n' +
             '.prompt or command - Place a dot to send / commands or literal prompts.\n' +
             '/keys <text> - Send text without Enter\n\n' +
@@ -689,6 +962,7 @@ export class CoderBot {
             '*Viewing Output:*\n' +
             '/screen - Capture and view terminal screenshot\n' +
             '/urls - Show all URLs found in terminal output\n' +
+            '/projects - List and select project directories\n' +
             'Click 🔄 Refresh button on screenshots to update\n\n' +
             '*Media:*\n' +
             '• Upload photos or files - Automatically saved to received directory\n' +
@@ -698,6 +972,7 @@ export class CoderBot {
             '*Other:*\n' +
             '/start - Show quick start guide\n' +
             '/help - Show this detailed help\n' +
+            '/macros - Show configured message placeholders (m0-m9)\n' +
             '/killbot - Shutdown the bot\n\n' +
             '💡 *Pro Tip:* Send messages directly to interact with the terminal!',
             { parse_mode: 'Markdown' }
@@ -733,6 +1008,73 @@ export class CoderBot {
                 { parse_mode: 'Markdown' }
             );
 
+            await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+        } catch (error) {
+            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
+        }
+    }
+
+    private async handleProjects(ctx: Context): Promise<void> {
+        try {
+            const homeDir = this.configService.getHomeDirectory();
+            
+            const entries = await fs.promises.readdir(homeDir, { withFileTypes: true });
+            const directories = entries
+                .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
+                .map(entry => path.join(homeDir, entry.name))
+                .sort();
+
+            if (directories.length === 0) {
+                const sentMsg = await ctx.reply(
+                    '📁 *No Projects Found*\n\n' +
+                    `No directories found in ${homeDir}`,
+                    { parse_mode: 'Markdown' }
+                );
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+                return;
+            }
+
+            const keyboard = new InlineKeyboard();
+            
+            directories.forEach((dir, index) => {
+                const dirName = path.basename(dir);
+                keyboard.text(dirName, `project:${dir}`);
+                if ((index + 1) % 2 === 0) {
+                    keyboard.row();
+                }
+            });
+            
+            if (directories.length % 2 !== 0) {
+                keyboard.row();
+            }
+            
+            keyboard.text('❌ Cancel', 'project:cancel');
+
+            const sentMsg = await ctx.reply(
+                `📁 *Select a Project* (${directories.length})\n\nChoose a directory to navigate to:`,
+                {
+                    parse_mode: 'Markdown',
+                    reply_markup: keyboard
+                }
+            );
+
+            await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+        } catch (error) {
+            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
+        }
+    }
+
+    private async handleMacros(ctx: Context): Promise<void> {
+        try {
+            let message = '⚙️ *Message Placeholders*\n\n';
+            
+            for (let i = 0; i <= 9; i++) {
+                const value = this.configService.getMPlaceholder(i);
+                const displayValue = value ? `\`${value}\`` : '_undefined_';
+                message += `\`[m${i}]\` → ${displayValue}\n`;
+            }
+
+            const sentMsg = await ctx.reply(message, { parse_mode: 'Markdown' });
             await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
         } catch (error) {
             await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));

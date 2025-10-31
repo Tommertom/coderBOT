@@ -82,4 +82,9 @@ startip/
 # Docker runner user instances
 users/
 
+# Custom coder configurations (user-specific)
+customcoders/
+
 core
+
+.env*

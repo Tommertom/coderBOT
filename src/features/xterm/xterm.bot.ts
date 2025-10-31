@@ -289,7 +289,7 @@ export class XtermBot {
 
                 this.xtermService.writeRawToSession(userId, keys);
 
-                const sentMsg = await ctx.reply(`✅ Sent keys: \`${keys}\`\n\n${Messages.VIEW_SCREEN_HINT}`, { parse_mode: 'Markdown' });
+                const sentMsg = await ctx.reply(`✅ Sent keys: \`${keys}\``, { parse_mode: 'Markdown' });
                 await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 0.5);
                 this.triggerAutoRefresh(userId, chatId);
             } catch (error) {
@@ -421,6 +421,20 @@ export class XtermBot {
                 return;
             }
 
+            // Handle ESC key button
+            if (callbackData === 'key_esc') {
+                if (!this.xtermService.hasSession(userId)) {
+                    await this.safeAnswerCallbackQuery(ctx, Messages.NO_ACTIVE_TERMINAL_SESSION);
+                    return;
+                }
+
+                const escKey = this.SPECIAL_KEYS['esc'];
+                this.xtermService.writeRawToSession(userId, escKey.sequence);
+                await this.safeAnswerCallbackQuery(ctx, SuccessMessages.SENT_SPECIAL_KEY(escKey.display));
+                this.triggerAutoRefresh(userId, chatId);
+                return;
+            }
+
             if (!this.xtermService.hasSession(userId)) {
                 await this.safeAnswerCallbackQuery(ctx, Messages.NO_ACTIVE_TERMINAL_SESSION);
                 return;
@@ -479,7 +493,7 @@ export class XtermBot {
 
             this.xtermService.writeRawToSession(userId, '\r');
 
-            const sentMsg = await ctx.reply(`✅ Sent - ${Messages.VIEW_SCREEN_HINT}`);
+            const sentMsg = await ctx.reply(`✅ Sent`);
 
             await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
 

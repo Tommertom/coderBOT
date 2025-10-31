@@ -42,6 +42,9 @@ export class ConfigService {
     // Verbose Logging Configuration
     private readonly verboseLogging: boolean;
 
+    // Message Placeholders
+    private readonly mPlaceholders: Map<number, string>;
+
     // System Environment
     private readonly homeDirectory: string;
     private readonly systemEnv: { [key: string]: string };
@@ -107,6 +110,15 @@ export class ConfigService {
         const verboseLoggingValue = process.env.VERBOSE_LOGGING?.toLowerCase();
         // Default to true if not set or if explicitly set to 'true' or '1'
         this.verboseLogging = verboseLoggingValue !== 'false' && verboseLoggingValue !== '0';
+
+        // Load message placeholders (M0-M9)
+        this.mPlaceholders = new Map();
+        for (let i = 0; i <= 9; i++) {
+            const value = process.env[`M${i}`];
+            if (value && value.trim() !== '') {
+                this.mPlaceholders.set(i, value);
+            }
+        }
 
         // Load system environment
         this.homeDirectory = process.env.HOME || '/tmp';
@@ -200,6 +212,15 @@ export class ConfigService {
     // Verbose Logging Configuration Getter
     isVerboseLoggingEnabled(): boolean {
         return this.verboseLogging;
+    }
+
+    // Message Placeholder Getters
+    getMPlaceholder(index: number): string | undefined {
+        return this.mPlaceholders.get(index);
+    }
+
+    getAllMPlaceholders(): Map<number, string> {
+        return new Map(this.mPlaceholders);
     }
 
     // System Environment Getters

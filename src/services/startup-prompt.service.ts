@@ -21,72 +21,97 @@ export class StartupPromptService {
     }
 
     /**
-     * Save a startup prompt for a specific bot ID
+     * Save a startup prompt for a specific bot ID and assistant type
      */
-    savePrompt(botId: string, message: string): void {
+    savePrompt(botId: string, assistantType: string, message: string): void {
         try {
-            const filename = `copilot-${botId}.json`;
+            const filename = `${assistantType}-${botId}.json`;
             const filepath = path.join(this.startupDir, filename);
             
             const data = {
                 botId,
+                assistantType,
                 message,
                 timestamp: new Date().toISOString()
             };
 
             fs.writeFileSync(filepath, JSON.stringify(data, null, 2), 'utf-8');
-            console.log(`Saved startup prompt for bot ${botId}: ${filepath}`);
+            console.log(`Saved startup prompt for ${assistantType} (bot ${botId}): ${filepath}`);
         } catch (error) {
-            console.error(`Failed to save startup prompt for bot ${botId}:`, error);
+            console.error(`Failed to save startup prompt for ${assistantType} (bot ${botId}):`, error);
             throw error;
         }
     }
 
     /**
-     * Load a startup prompt for a specific bot ID
+     * Load a startup prompt for a specific bot ID and assistant type
      */
-    loadPrompt(botId: string): string | null {
+    loadPrompt(botId: string, assistantType: string): string | null {
         try {
-            const filename = `copilot-${botId}.json`;
-            const filepath = path.join(this.startupDir, filename);
+            // Try new format first
+            let filename = `${assistantType}-${botId}.json`;
+            let filepath = path.join(this.startupDir, filename);
 
-            if (!fs.existsSync(filepath)) {
-                return null;
+            if (fs.existsSync(filepath)) {
+                const content = fs.readFileSync(filepath, 'utf-8');
+                const data = JSON.parse(content);
+                return data.message || null;
             }
 
-            const content = fs.readFileSync(filepath, 'utf-8');
-            const data = JSON.parse(content);
-            
-            return data.message || null;
+            // Fallback to old format for copilot (backward compatibility)
+            if (assistantType === 'copilot') {
+                filename = `copilot-${botId}.json`;
+                filepath = path.join(this.startupDir, filename);
+                
+                if (fs.existsSync(filepath)) {
+                    const content = fs.readFileSync(filepath, 'utf-8');
+                    const data = JSON.parse(content);
+                    return data.message || null;
+                }
+            }
+
+            return null;
         } catch (error) {
-            console.error(`Failed to load startup prompt for bot ${botId}:`, error);
+            console.error(`Failed to load startup prompt for ${assistantType} (bot ${botId}):`, error);
             return null;
         }
     }
 
     /**
-     * Check if a startup prompt exists for a specific bot ID
+     * Check if a startup prompt exists for a specific bot ID and assistant type
      */
-    hasPrompt(botId: string): boolean {
-        const filename = `copilot-${botId}.json`;
+    hasPrompt(botId: string, assistantType: string): boolean {
+        const filename = `${assistantType}-${botId}.json`;
         const filepath = path.join(this.startupDir, filename);
-        return fs.existsSync(filepath);
+        
+        if (fs.existsSync(filepath)) {
+            return true;
+        }
+
+        // Check old format for copilot
+        if (assistantType === 'copilot') {
+            const oldFilename = `copilot-${botId}.json`;
+            const oldFilepath = path.join(this.startupDir, oldFilename);
+            return fs.existsSync(oldFilepath);
+        }
+
+        return false;
     }
 
     /**
-     * Delete a startup prompt for a specific bot ID
+     * Delete a startup prompt for a specific bot ID and assistant type
      */
-    deletePrompt(botId: string): void {
+    deletePrompt(botId: string, assistantType: string): void {
         try {
-            const filename = `copilot-${botId}.json`;
+            const filename = `${assistantType}-${botId}.json`;
             const filepath = path.join(this.startupDir, filename);
 
             if (fs.existsSync(filepath)) {
                 fs.unlinkSync(filepath);
-                console.log(`Deleted startup prompt for bot ${botId}`);
+                console.log(`Deleted startup prompt for ${assistantType} (bot ${botId})`);
             }
         } catch (error) {
-            console.error(`Failed to delete startup prompt for bot ${botId}:`, error);
+            console.error(`Failed to delete startup prompt for ${assistantType} (bot ${botId}):`, error);
         }
     }
 }

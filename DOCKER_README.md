@@ -124,6 +124,19 @@ CLEAN_UP_MEDIADIR=false
 
 # Message Management (Optional)
 MESSAGE_DELETE_TIMEOUT=10000
+
+# Message Placeholders (Optional)
+# Define text replacements for [m0] through [m9] placeholders in messages
+M0=
+M1=
+M2=
+M3=
+M4=
+M5=
+M6=
+M7=
+M8=
+M9=
 ```
 
 **Finding Your Telegram User ID:**
@@ -188,6 +201,7 @@ The docker-compose.yml uses `npx @tommertom/coderbot` to run the latest publishe
 - `MEDIA_TMP_LOCATION` - Media directory (default: `/tmp/coderBOT_media`)
 - `CLEAN_UP_MEDIADIR` - Delete media on startup (default: `false`)
 - `MESSAGE_DELETE_TIMEOUT` - Auto-delete messages in ms (default: `10000`)
+- `M0` through `M9` - Message placeholder text replacements (see Message Placeholders section in main README)
 
 ## Volumes and Persistence
 

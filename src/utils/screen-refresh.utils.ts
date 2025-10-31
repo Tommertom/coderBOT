@@ -6,7 +6,7 @@ import { ConfigService } from '../services/config.service.js';
 export class ScreenRefreshUtils {
     /**
      * Create a standard inline keyboard for screen display.
-     * Layout: Refresh button on top, then number buttons below.
+     * Layout: Refresh button on top, then number buttons.
      */
     static createScreenKeyboard(): InlineKeyboard {
         return new InlineKeyboard()
@@ -50,7 +50,7 @@ export class ScreenRefreshUtils {
         let refreshCount = 0;
         let lastBufferHash: string | null = null;
 
-        const interval = setInterval(async () => {
+        const performRefresh = async () => {
             refreshCount++;
 
             try {
@@ -114,7 +114,13 @@ export class ScreenRefreshUtils {
             if (refreshCount >= MAX_REFRESH_COUNT) {
                 xtermService.clearRefreshInterval(userId);
             }
-        }, REFRESH_INTERVAL_MS);
+        };
+
+        // Perform immediate first refresh
+        performRefresh();
+
+        // Set up interval for subsequent refreshes
+        const interval = setInterval(performRefresh, REFRESH_INTERVAL_MS);
 
         // Store the interval in the session
         xtermService.setRefreshInterval(userId, interval);
