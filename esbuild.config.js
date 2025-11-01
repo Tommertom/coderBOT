@@ -53,9 +53,6 @@ async function build() {
       ...sharedOptions,
       entryPoints: ["src/cli.ts"],
       outfile: "dist/cli.js",
-      banner: {
-        js: "#!/usr/bin/env node\n",
-      },
     });
 
     // Build bot worker
