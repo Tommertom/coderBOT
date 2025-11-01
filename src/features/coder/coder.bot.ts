@@ -87,6 +87,9 @@ export class CoderBot {
         bot.command('macros', AccessControlMiddleware.requireAccess, this.handleMacros.bind(this));
         bot.on('callback_query:data', AccessControlMiddleware.requireAccess, this.handleCallbackQuery.bind(this));
         bot.on('message:photo', AccessControlMiddleware.requireAccess, this.handlePhoto.bind(this));
+        bot.on('message:video', AccessControlMiddleware.requireAccess, this.handleVideo.bind(this));
+        bot.on('message:audio', AccessControlMiddleware.requireAccess, this.handleAudio.bind(this));
+        bot.on('message:voice', AccessControlMiddleware.requireAccess, this.handleVoice.bind(this));
         bot.on('message:text', AccessControlMiddleware.requireAccess, this.handleTextMessage.bind(this));
         
         // Load and register custom coders on startup
@@ -404,6 +407,141 @@ export class CoderBot {
         } catch (error) {
             await ctx.reply(
                 '❌ Failed to save image.\n\n' +
+                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+        }
+    }
+
+    private async handleVideo(ctx: Context): Promise<void> {
+        if (!this.bot || !ctx.message?.video) {
+            return;
+        }
+
+        try {
+            const video = ctx.message.video;
+            const file = await ctx.api.getFile(video.file_id);
+
+            if (!file.file_path) {
+                await ctx.reply('❌ Failed to get file path from Telegram.');
+                return;
+            }
+
+            const fileUrl = `https://api.telegram.org/file/bot${this.botToken}/${file.file_path}`;
+
+            const timestamp = Date.now();
+            const ext = path.extname(file.file_path) || '.mp4';
+            const filename = `video_${timestamp}${ext}`;
+            const absolutePath = path.join(this.receivedPath, filename);
+
+            const fileStream = fs.createWriteStream(absolutePath);
+
+            await new Promise<void>((resolve, reject) => {
+                https.get(fileUrl, (response) => {
+                    response.pipe(fileStream);
+                    fileStream.on('finish', () => {
+                        fileStream.close();
+                        resolve();
+                    });
+                }).on('error', (err) => {
+                    fs.unlink(absolutePath, () => { });
+                    reject(err);
+                });
+            });
+
+            await ctx.reply(`✅ Video saved:\n\`${absolutePath}\``, { parse_mode: 'Markdown' });
+        } catch (error) {
+            await ctx.reply(
+                '❌ Failed to save video.\n\n' +
+                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+        }
+    }
+
+    private async handleAudio(ctx: Context): Promise<void> {
+        if (!this.bot || !ctx.message?.audio) {
+            return;
+        }
+
+        try {
+            const audio = ctx.message.audio;
+            const file = await ctx.api.getFile(audio.file_id);
+
+            if (!file.file_path) {
+                await ctx.reply('❌ Failed to get file path from Telegram.');
+                return;
+            }
+
+            const fileUrl = `https://api.telegram.org/file/bot${this.botToken}/${file.file_path}`;
+
+            const timestamp = Date.now();
+            const ext = path.extname(file.file_path) || '.mp3';
+            const filename = `audio_${timestamp}${ext}`;
+            const absolutePath = path.join(this.receivedPath, filename);
+
+            const fileStream = fs.createWriteStream(absolutePath);
+
+            await new Promise<void>((resolve, reject) => {
+                https.get(fileUrl, (response) => {
+                    response.pipe(fileStream);
+                    fileStream.on('finish', () => {
+                        fileStream.close();
+                        resolve();
+                    });
+                }).on('error', (err) => {
+                    fs.unlink(absolutePath, () => { });
+                    reject(err);
+                });
+            });
+
+            await ctx.reply(`✅ Audio saved:\n\`${absolutePath}\``, { parse_mode: 'Markdown' });
+        } catch (error) {
+            await ctx.reply(
+                '❌ Failed to save audio.\n\n' +
+                `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+        }
+    }
+
+    private async handleVoice(ctx: Context): Promise<void> {
+        if (!this.bot || !ctx.message?.voice) {
+            return;
+        }
+
+        try {
+            const voice = ctx.message.voice;
+            const file = await ctx.api.getFile(voice.file_id);
+
+            if (!file.file_path) {
+                await ctx.reply('❌ Failed to get file path from Telegram.');
+                return;
+            }
+
+            const fileUrl = `https://api.telegram.org/file/bot${this.botToken}/${file.file_path}`;
+
+            const timestamp = Date.now();
+            const ext = path.extname(file.file_path) || '.ogg';
+            const filename = `voice_${timestamp}${ext}`;
+            const absolutePath = path.join(this.receivedPath, filename);
+
+            const fileStream = fs.createWriteStream(absolutePath);
+
+            await new Promise<void>((resolve, reject) => {
+                https.get(fileUrl, (response) => {
+                    response.pipe(fileStream);
+                    fileStream.on('finish', () => {
+                        fileStream.close();
+                        resolve();
+                    });
+                }).on('error', (err) => {
+                    fs.unlink(absolutePath, () => { });
+                    reject(err);
+                });
+            });
+
+            await ctx.reply(`✅ Voice message saved:\n\`${absolutePath}\``, { parse_mode: 'Markdown' });
+        } catch (error) {
+            await ctx.reply(
+                '❌ Failed to save voice message.\n\n' +
                 `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
             );
         }
@@ -964,8 +1102,13 @@ export class CoderBot {
             '/urls - Show all URLs found in terminal output\n' +
             '/projects - List and select project directories\n' +
             'Click 🔄 Refresh button on screenshots to update\n\n' +
-            '*Media:*\n' +
-            '• Upload photos or files - Automatically saved to received directory\n' +
+            '*Media Upload & Download:*\n' +
+            '• *Supported Upload Types:*\n' +
+            '  - 📷 Photos (JPG, PNG, WebP, etc.)\n' +
+            '  - 🎥 Videos (MP4, MOV, AVI, etc.)\n' +
+            '  - 🎵 Audio files (MP3, WAV, AAC, etc.)\n' +
+            '  - 🎤 Voice messages (OGG, etc.)\n' +
+            '• Uploaded media is automatically saved to the received directory\n' +
             '• Files copied to \\[media\\] directory will be sent to you automatically\n' +
             '• Use \\[media\] in commands - e.g., "cp output.png \\[media\\]" to send files\n' +
             '• The bot watches this directory and sends any new files to you\n\n' +
