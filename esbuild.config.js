@@ -1,6 +1,7 @@
 import * as esbuild from "esbuild";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { rmSync } from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -35,6 +36,10 @@ const sharedOptions = {
 
 async function build() {
   try {
+    // Clean dist folder before building
+    console.log("🧹 Cleaning dist folder...");
+    rmSync("dist", { recursive: true, force: true });
+    
     console.log(
       `🔨 Building coderBOT (${
         isProduction ? "production" : "development"
