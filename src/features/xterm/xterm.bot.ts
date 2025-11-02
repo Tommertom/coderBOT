@@ -2,6 +2,7 @@ import { Bot, Context, InputFile, InlineKeyboard } from 'grammy';
 import { XtermService } from './xterm.service.js';
 import { XtermRendererService } from './xterm-renderer.service.js';
 import { ConfigService } from '../../services/config.service.js';
+import { RefreshStateService } from '../../services/refresh-state.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
 import { MessageUtils } from '../../utils/message.utils.js';
 import { ErrorUtils } from '../../utils/error.utils.js';
@@ -15,6 +16,7 @@ export class XtermBot {
     private xtermService: XtermService;
     private xtermRendererService: XtermRendererService;
     private configService: ConfigService;
+    private refreshStateService: RefreshStateService;
 
     private readonly CTRL_MAPPINGS: Record<string, string> = {
         '@': '\x00',
@@ -68,12 +70,14 @@ export class XtermBot {
         botId: string,
         xtermService: XtermService,
         xtermRendererService: XtermRendererService,
-        configService: ConfigService
+        configService: ConfigService,
+        refreshStateService: RefreshStateService
     ) {
         this.botId = botId;
         this.xtermService = xtermService;
         this.xtermRendererService = xtermRendererService;
         this.configService = configService;
+        this.refreshStateService = refreshStateService;
     }
 
     registerHandlers(bot: Bot): void {
@@ -81,6 +85,7 @@ export class XtermBot {
         bot.command('xterm', AccessControlMiddleware.requireAccess, this.handleXterm.bind(this));
         bot.command('keys', AccessControlMiddleware.requireAccess, this.handleKeys.bind(this));
         bot.command('ctrl', AccessControlMiddleware.requireAccess, this.handleCtrl.bind(this));
+        bot.command('refresh', AccessControlMiddleware.requireAccess, this.handleRefresh.bind(this));
 
         // Register all special key handlers using the generic method
         Object.keys(this.SPECIAL_KEYS).forEach(keyName => {
@@ -122,7 +127,8 @@ export class XtermBot {
                 this.bot,
                 this.xtermService,
                 this.xtermRendererService,
-                this.configService
+                this.configService,
+                this.refreshStateService
             );
         }
     }
@@ -325,6 +331,75 @@ export class XtermBot {
                 await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_KEY, error));
             }
         });
+    }
+
+    private async handleRefresh(ctx: Context): Promise<void> {
+        const userId = ctx.from!.id.toString();
+        const message = ctx.message?.text || '';
+        const args = message.replace('/refresh', '').trim().toLowerCase();
+
+        try {
+            const globalDefault = this.configService.isScreenRefreshEnabled();
+            const currentState = this.refreshStateService.isRefreshEnabled(userId, globalDefault);
+            const intervalSeconds = this.configService.getScreenRefreshInterval() / 1000;
+            const maxCount = this.configService.getScreenRefreshMaxCount();
+
+            // No argument - show current state
+            if (!args) {
+                const stateText = currentState ? 'ON ✅' : 'OFF ❌';
+                const hasCustom = this.refreshStateService.hasCustomPreference(userId);
+                const customNote = hasCustom ? '\n(Custom preference set)' : '\n(Using global default)';
+                
+                await ctx.reply(
+                    `🔄 *Auto-Refresh Status*\n\n` +
+                    `*Current state:* ${stateText}${customNote}\n` +
+                    `*Interval:* ${intervalSeconds} seconds\n` +
+                    `*Max refreshes:* ${maxCount} times\n` +
+                    `*Total duration:* ${intervalSeconds * maxCount} seconds\n\n` +
+                    `*Usage:*\n` +
+                    `• \`/refresh on\` - Enable auto-refresh\n` +
+                    `• \`/refresh off\` - Disable auto-refresh\n` +
+                    `• \`/refresh\` - Show current status`,
+                    { parse_mode: 'Markdown' }
+                );
+                return;
+            }
+
+            // Handle on/off argument
+            if (args === 'on') {
+                this.refreshStateService.setRefreshEnabled(userId, true);
+                await ctx.reply(
+                    `✅ *Auto-refresh enabled*\n\n` +
+                    `Screens will auto-refresh ${maxCount} times at ${intervalSeconds}s intervals after you send commands.`,
+                    { parse_mode: 'Markdown' }
+                );
+                return;
+            }
+
+            if (args === 'off') {
+                this.refreshStateService.setRefreshEnabled(userId, false);
+                // Also clear any running refresh interval
+                this.xtermService.clearRefreshInterval(userId);
+                await ctx.reply(
+                    `❌ *Auto-refresh disabled*\n\n` +
+                    `Screens will no longer auto-refresh. Use /screen to manually refresh.`,
+                    { parse_mode: 'Markdown' }
+                );
+                return;
+            }
+
+            // Invalid argument
+            await ctx.reply(
+                `⚠️ Invalid argument: \`${args}\`\n\n` +
+                `*Usage:*\n` +
+                `• \`/refresh on\` - Enable auto-refresh\n` +
+                `• \`/refresh off\` - Disable auto-refresh\n` +
+                `• \`/refresh\` - Show current status`,
+                { parse_mode: 'Markdown' }
+            );
+        } catch (error) {
+            await ctx.reply(ErrorUtils.createErrorMessage('manage refresh settings', error));
+        }
     }
 
     private async handleScreen(ctx: Context): Promise<void> {

@@ -56,6 +56,10 @@ AUTO_NOTIFY_URLS=true
 
 # Auto-refresh Configuration
 # Automatically refresh the last shown terminal screenshot after sending commands
+# Enable/disable auto-refresh globally (default: true)
+# Users can override this with the /refresh command
+SCREEN_REFRESH_ENABLED=true
+
 # Refresh interval in milliseconds (default: 5000 = 5 seconds)
 SCREEN_REFRESH_INTERVAL=5000
 

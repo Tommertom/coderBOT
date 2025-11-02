@@ -47,6 +47,7 @@ coderbot
 - 🤖 **AI Coding Assistant Support**: Native integration with GitHub Copilot CLI, Claude AI, Google Gemini, Gemini CLI, or any command-line AI tool
 - 🔐 **Robust Access Control**: Environment-based user authentication with optional auto-kill on unauthorized access
 - 📸 **Terminal Screenshots**: Real-time visual feedback with terminal screen captures using Puppeteer
+- 🔄 **Auto-Refresh**: Configurable automatic screen refreshes after commands with per-user on/off control
 - 📁 **Media File Watcher**: Automatically send generated files (images, videos, documents) to users
 - ⌨️ **Full Keyboard Control**: Send any key combination including all control characters (Ctrl+A through Ctrl+Z, special keys)
 - 🔄 **Session Management**: Multiple concurrent sessions with automatic timeout handling
@@ -123,6 +124,10 @@ AUTO_NOTIFY_URLS=true
 
 # Auto-refresh Configuration (Optional)
 # Automatically refresh the last shown terminal screenshot after sending commands
+# Enable/disable auto-refresh globally (default: true)
+# Users can override this per-session with the /refresh command
+SCREEN_REFRESH_ENABLED=true
+
 # The first refresh happens immediately, then subsequent refreshes at the interval
 # Refresh interval in milliseconds (default: 5000 = 5 seconds)
 SCREEN_REFRESH_INTERVAL=5000
@@ -357,6 +362,9 @@ Common examples:
 
 ### Viewing Output
 - `/screen` - Capture and view terminal screenshot
+- `/refresh` - Show auto-refresh status and configuration
+- `/refresh on` - Enable automatic screen refreshes after commands
+- `/refresh off` - Disable automatic screen refreshes
 - `/urls` - Show all URLs discovered in terminal output
 - `/projects` - List and select project directories from home directory
 - `/macros` - Show all configured message placeholders (m0-m9) and their values

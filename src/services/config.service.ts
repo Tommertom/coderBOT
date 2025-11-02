@@ -31,6 +31,7 @@ export class ConfigService {
     // Auto-refresh Configuration
     private readonly screenRefreshInterval: number;
     private readonly screenRefreshMaxCount: number;
+    private readonly screenRefreshEnabled: boolean;
 
     // Bot Token Monitoring
     private readonly botTokenMonitorInterval: number;
@@ -92,6 +93,8 @@ export class ConfigService {
         // Load auto-refresh configuration
         this.screenRefreshInterval = parseInt(process.env.SCREEN_REFRESH_INTERVAL || '5000', 10);
         this.screenRefreshMaxCount = parseInt(process.env.SCREEN_REFRESH_MAX_COUNT || '5', 10);
+        const screenRefreshEnabledValue = process.env.SCREEN_REFRESH_ENABLED?.toLowerCase();
+        this.screenRefreshEnabled = screenRefreshEnabledValue !== 'false' && screenRefreshEnabledValue !== '0';
 
         // Load bot token monitoring configuration
         this.botTokenMonitorInterval = parseInt(process.env.BOT_TOKEN_MONITOR_INTERVAL || '300000', 10);
@@ -191,6 +194,10 @@ export class ConfigService {
         return this.screenRefreshMaxCount;
     }
 
+    isScreenRefreshEnabled(): boolean {
+        return this.screenRefreshEnabled;
+    }
+
     // Bot Token Monitoring Getters
     getBotTokenMonitorInterval(): number {
         return this.botTokenMonitorInterval;
@@ -261,6 +268,7 @@ export class ConfigService {
   - Clean Up Media Dir: ${this.cleanUpMediaDir}
   - Message Delete Timeout: ${this.messageDeleteTimeout}ms
   - Auto Notify URLs: ${this.autoNotifyUrls}
+  - Screen Refresh Enabled: ${this.screenRefreshEnabled}
   - Screen Refresh Interval: ${this.screenRefreshInterval}ms
   - Screen Refresh Max Count: ${this.screenRefreshMaxCount}
   - Bot Token Monitor Interval: ${this.botTokenMonitorInterval}ms

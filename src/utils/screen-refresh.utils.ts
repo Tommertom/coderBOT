@@ -2,6 +2,7 @@ import { Bot, InputFile, InlineKeyboard } from 'grammy';
 import { XtermService } from '../features/xterm/xterm.service.js';
 import { XtermRendererService } from '../features/xterm/xterm-renderer.service.js';
 import { ConfigService } from '../services/config.service.js';
+import { RefreshStateService } from '../services/refresh-state.service.js';
 
 export class ScreenRefreshUtils {
     /**
@@ -27,8 +28,17 @@ export class ScreenRefreshUtils {
         bot: Bot,
         xtermService: XtermService,
         xtermRendererService: XtermRendererService,
-        configService: ConfigService
+        configService: ConfigService,
+        refreshStateService: RefreshStateService
     ): void {
+        // Check if refresh is enabled for this user
+        const globalDefault = configService.isScreenRefreshEnabled();
+        const isEnabled = refreshStateService.isRefreshEnabled(userId, globalDefault);
+        
+        if (!isEnabled) {
+            return;
+        }
+
         const REFRESH_INTERVAL_MS = configService.getScreenRefreshInterval();
         const MAX_REFRESH_COUNT = configService.getScreenRefreshMaxCount();
         // Check if refresh is already running

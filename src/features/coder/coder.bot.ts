@@ -3,6 +3,7 @@ import { XtermService } from '../xterm/xterm.service.js';
 import { XtermRendererService } from '../xterm/xterm-renderer.service.js';
 import { CoderService } from './coder.service.js';
 import { ConfigService } from '../../services/config.service.js';
+import { RefreshStateService } from '../../services/refresh-state.service.js';
 import { StartupPromptService } from '../../services/startup-prompt.service.js';
 import { CustomCoderService } from '../../services/custom-coder.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
@@ -31,6 +32,7 @@ export class CoderBot {
     private xtermRendererService: XtermRendererService;
     private coderService: CoderService;
     private configService: ConfigService;
+    private refreshStateService: RefreshStateService;
     private startupPromptService: StartupPromptService;
     private customCoderService: CustomCoderService;
     private activeAssistantType: AssistantType | string | null = null;
@@ -43,7 +45,8 @@ export class CoderBot {
         xtermService: XtermService,
         xtermRendererService: XtermRendererService,
         coderService: CoderService,
-        configService: ConfigService
+        configService: ConfigService,
+        refreshStateService: RefreshStateService
     ) {
         this.botId = botId;
         this.botToken = botToken;
@@ -51,6 +54,7 @@ export class CoderBot {
         this.xtermRendererService = xtermRendererService;
         this.coderService = coderService;
         this.configService = configService;
+        this.refreshStateService = refreshStateService;
         this.startupPromptService = new StartupPromptService();
         this.customCoderService = new CustomCoderService();
         this.mediaPath = this.coderService.getMediaPath();
@@ -107,7 +111,8 @@ export class CoderBot {
                 this.bot,
                 this.xtermService,
                 this.xtermRendererService,
-                this.configService
+                this.configService,
+                this.refreshStateService
             );
         }
     }
@@ -599,7 +604,8 @@ export class CoderBot {
                     this.bot,
                     this.xtermService,
                     this.xtermRendererService,
-                    this.configService
+                    this.configService,
+                    this.refreshStateService
                 );
             }
         } catch (error) {
@@ -1006,7 +1012,8 @@ export class CoderBot {
                     this.bot,
                     this.xtermService,
                     this.xtermRendererService,
-                    this.configService
+                    this.configService,
+                    this.refreshStateService
                 );
             }
         } catch (error) {
