@@ -56,10 +56,6 @@ AUTO_NOTIFY_URLS=true
 
 # Auto-refresh Configuration
 # Automatically refresh the last shown terminal screenshot after sending commands
-# Enable/disable auto-refresh globally (default: true)
-# Users can override this with the /refresh command
-SCREEN_REFRESH_ENABLED=true
-
 # Refresh interval in milliseconds (default: 5000 = 5 seconds)
 SCREEN_REFRESH_INTERVAL=5000
 
@@ -90,6 +86,14 @@ CONTROL_BOT_ADMIN_IDS=
 # from child bot processes to its own console for debugging and monitoring
 # Set to false to disable verbose console output (default: true)
 VERBOSE_LOGGING=true
+
+# Airplane Mode (Optional)
+# When enabled (on/true/1), the bot will send terminal output as text messages
+# instead of rendered images. This uses less bandwidth and is faster.
+# In airplane mode, only the last 500 characters of terminal output are sent,
+# sanitized from ANSI codes and control characters.
+# Set to off/false/0 to use normal image rendering mode (default: off)
+AIRPLANE_MODE=off
 
 
 # ============================================================================

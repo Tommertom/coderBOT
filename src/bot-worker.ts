@@ -85,7 +85,7 @@ async function startWorker() {
             services.xtermService,
             services.xtermRendererService,
             services.configService,
-            services.refreshStateService
+            services.airplaneStateService
         );
 
         const coderBot = new CoderBot(
@@ -95,7 +95,7 @@ async function startWorker() {
             services.xtermRendererService,
             services.coderService,
             services.configService,
-            services.refreshStateService
+            services.airplaneStateService
         );
 
         // Register handlers - CoderBot first for general commands, then XtermBot for specific ones

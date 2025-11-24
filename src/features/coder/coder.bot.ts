@@ -3,7 +3,7 @@ import { XtermService } from '../xterm/xterm.service.js';
 import { XtermRendererService } from '../xterm/xterm-renderer.service.js';
 import { CoderService } from './coder.service.js';
 import { ConfigService } from '../../services/config.service.js';
-import { RefreshStateService } from '../../services/refresh-state.service.js';
+import { AirplaneStateService } from '../../services/airplane-state.service.js';
 import { StartupPromptService } from '../../services/startup-prompt.service.js';
 import { CustomCoderService } from '../../services/custom-coder.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
@@ -11,6 +11,7 @@ import { MessageUtils } from '../../utils/message.utils.js';
 import { ErrorUtils } from '../../utils/error.utils.js';
 import { ScreenRefreshUtils } from '../../utils/screen-refresh.utils.js';
 import { CommandMenuUtils } from '../../utils/command-menu.utils.js';
+import { TextSanitizationUtils } from '../../utils/text-sanitization.utils.js';
 import { Messages, SuccessMessages, ErrorActions } from '../../constants/messages.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -32,7 +33,7 @@ export class CoderBot {
     private xtermRendererService: XtermRendererService;
     private coderService: CoderService;
     private configService: ConfigService;
-    private refreshStateService: RefreshStateService;
+    private airplaneStateService: AirplaneStateService;
     private startupPromptService: StartupPromptService;
     private customCoderService: CustomCoderService;
     private activeAssistantType: AssistantType | string | null = null;
@@ -46,7 +47,7 @@ export class CoderBot {
         xtermRendererService: XtermRendererService,
         coderService: CoderService,
         configService: ConfigService,
-        refreshStateService: RefreshStateService
+        airplaneStateService: AirplaneStateService
     ) {
         this.botId = botId;
         this.botToken = botToken;
@@ -54,7 +55,7 @@ export class CoderBot {
         this.xtermRendererService = xtermRendererService;
         this.coderService = coderService;
         this.configService = configService;
-        this.refreshStateService = refreshStateService;
+        this.airplaneStateService = airplaneStateService;
         this.startupPromptService = new StartupPromptService();
         this.customCoderService = new CustomCoderService();
         this.mediaPath = this.coderService.getMediaPath();
@@ -83,7 +84,6 @@ export class CoderBot {
         bot.command('startup', AccessControlMiddleware.requireAccess, this.handleStartup.bind(this));
         bot.command('start', AccessControlMiddleware.requireAccess, this.handleStart.bind(this));
         bot.command('help', AccessControlMiddleware.requireAccess, this.handleHelp.bind(this));
-        bot.command('esc', AccessControlMiddleware.requireAccess, this.handleEsc.bind(this));
         bot.command('close', AccessControlMiddleware.requireAccess, this.handleClose.bind(this));
         bot.command('killbot', AccessControlMiddleware.requireAccess, this.handleKillbot.bind(this));
         bot.command('urls', AccessControlMiddleware.requireAccess, this.handleUrls.bind(this));
@@ -112,7 +112,7 @@ export class CoderBot {
                 this.xtermService,
                 this.xtermRendererService,
                 this.configService,
-                this.refreshStateService
+                this.airplaneStateService
             );
         }
     }
@@ -172,24 +172,39 @@ export class CoderBot {
                     return;
                 }
 
-                // Update the existing screenshot
-                const dimensions = this.xtermService.getSessionDimensions(userId);
-
-                const imageBuffer = await this.xtermRendererService.renderToImage(
-                    outputBuffer,
-                    dimensions.rows,
-                    dimensions.cols
-                );
+                // Check airplane mode
+                const globalDefault = this.configService.isAirplaneModeEnabled();
+                const isAirplaneMode = this.airplaneStateService.isAirplaneEnabled(userId, globalDefault);
 
                 const keyboard = ScreenRefreshUtils.createScreenKeyboard();
 
                 try {
-                    await this.bot.api.editMessageMedia(chatId, lastMessageId, {
-                        type: 'photo',
-                        media: new InputFile(imageBuffer),
-                    }, {
-                        reply_markup: keyboard,
-                    });
+                    if (isAirplaneMode) {
+                        // Airplane mode: edit message text
+                        const sanitizedText = TextSanitizationUtils.getLastCharactersSanitized(outputBuffer, 750);
+                        const formattedText = TextSanitizationUtils.formatAsCodeBlock(sanitizedText);
+
+                        await this.bot.api.editMessageText(chatId, lastMessageId, formattedText, {
+                            parse_mode: 'Markdown',
+                            reply_markup: keyboard,
+                        });
+                    } else {
+                        // Normal mode: edit with image
+                        const dimensions = this.xtermService.getSessionDimensions(userId);
+
+                        const imageBuffer = await this.xtermRendererService.renderToImage(
+                            outputBuffer,
+                            dimensions.rows,
+                            dimensions.cols
+                        );
+
+                        await this.bot.api.editMessageMedia(chatId, lastMessageId, {
+                            type: 'photo',
+                            media: new InputFile(imageBuffer),
+                        }, {
+                            reply_markup: keyboard,
+                        });
+                    }
 
                     // Update the buffer hash after successful screenshot update
                     this.xtermService.setLastScreenshotBufferHash(userId, currentBufferHash);
@@ -262,23 +277,48 @@ export class CoderBot {
                 await this.safeAnswerCallbackQuery(ctx, Messages.REFRESHING);
 
                 const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
-                const dimensions = this.xtermService.getSessionDimensions(userId);
-
-                const imageBuffer = await this.xtermRendererService.renderToImage(
-                    outputBuffer,
-                    dimensions.rows,
-                    dimensions.cols
-                );
+                const globalDefault = this.configService.isAirplaneModeEnabled();
+                const isAirplaneMode = this.airplaneStateService.isAirplaneEnabled(userId, globalDefault);
 
                 const keyboard = ScreenRefreshUtils.createScreenKeyboard();
 
                 if (ctx.callbackQuery?.message) {
-                    await ctx.editMessageMedia({
-                        type: 'photo',
-                        media: new InputFile(imageBuffer),
-                    }, {
-                        reply_markup: keyboard,
-                    });
+                    if (isAirplaneMode) {
+                        // Airplane mode: edit message text
+                        const sanitizedText = TextSanitizationUtils.getLastCharactersSanitized(outputBuffer, 750);
+                        const formattedText = TextSanitizationUtils.formatAsCodeBlock(sanitizedText);
+
+                        try {
+                            await ctx.editMessageText(formattedText, {
+                                parse_mode: 'Markdown',
+                                reply_markup: keyboard,
+                            });
+                        } catch (error) {
+                            // If editing text fails (e.g., message was a photo), send new message
+                            console.error('Failed to edit message as text, message type mismatch:', error);
+                        }
+                    } else {
+                        // Normal mode: edit with image
+                        const dimensions = this.xtermService.getSessionDimensions(userId);
+
+                        const imageBuffer = await this.xtermRendererService.renderToImage(
+                            outputBuffer,
+                            dimensions.rows,
+                            dimensions.cols
+                        );
+
+                        try {
+                            await ctx.editMessageMedia({
+                                type: 'photo',
+                                media: new InputFile(imageBuffer),
+                            }, {
+                                reply_markup: keyboard,
+                            });
+                        } catch (error) {
+                            // If editing media fails (e.g., message was text), send new message
+                            console.error('Failed to edit message as photo, message type mismatch:', error);
+                        }
+                    }
 
                     // Update the buffer hash after successful screenshot update
                     const currentBufferHash = outputBuffer.join('');
@@ -605,7 +645,8 @@ export class CoderBot {
                     this.xtermService,
                     this.xtermRendererService,
                     this.configService,
-                    this.refreshStateService
+                    this.refreshStateService,
+                    this.airplaneStateService
                 );
             }
         } catch (error) {
@@ -629,21 +670,38 @@ export class CoderBot {
      */
     private async sendSessionScreenshot(ctx: Context, userId: string): Promise<void> {
         const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
-        const dimensions = this.xtermService.getSessionDimensions(userId);
-
-        const imageBuffer = await this.xtermRendererService.renderToImage(
-            outputBuffer,
-            dimensions.rows,
-            dimensions.cols
-        );
+        const globalDefault = this.configService.isAirplaneModeEnabled();
+        const isAirplaneMode = this.airplaneStateService.isAirplaneEnabled(userId, globalDefault);
 
         const inlineKeyboard = ScreenRefreshUtils.createScreenKeyboard();
 
-        const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
-            reply_markup: inlineKeyboard,
-        });
+        if (isAirplaneMode) {
+            // Airplane mode: send text instead of image
+            const sanitizedText = TextSanitizationUtils.getLastCharactersSanitized(outputBuffer, 750);
+            const formattedText = TextSanitizationUtils.formatAsCodeBlock(sanitizedText);
 
-        this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
+            const sentMessage = await ctx.reply(formattedText, {
+                parse_mode: 'Markdown',
+                reply_markup: inlineKeyboard,
+            });
+
+            this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
+        } else {
+            // Normal mode: render and send image
+            const dimensions = this.xtermService.getSessionDimensions(userId);
+
+            const imageBuffer = await this.xtermRendererService.renderToImage(
+                outputBuffer,
+                dimensions.rows,
+                dimensions.cols
+            );
+
+            const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
+                reply_markup: inlineKeyboard,
+            });
+
+            this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
+        }
 
         // Store the buffer hash to detect changes in future updates
         const currentBufferHash = outputBuffer.join('');
@@ -991,36 +1049,6 @@ export class CoderBot {
         }
     }
 
-    private async handleEsc(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-        const chatId = ctx.chat!.id;
-
-        try {
-            if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply(Messages.NO_ACTIVE_SESSION);
-                return;
-            }
-
-            this.xtermService.writeRawToSession(userId, '\x1b');
-            const sentMsg = await ctx.reply(SuccessMessages.SENT_SPECIAL_KEY('Escape key'));
-            await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-
-            if (this.bot) {
-                ScreenRefreshUtils.startAutoRefresh(
-                    userId,
-                    chatId,
-                    this.bot,
-                    this.xtermService,
-                    this.xtermRendererService,
-                    this.configService,
-                    this.refreshStateService
-                );
-            }
-        } catch (error) {
-            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_ESCAPE, error));
-        }
-    }
-
     private async handleClose(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
         const chatId = ctx.chat!.id;
@@ -1069,7 +1097,7 @@ export class CoderBot {
             { parse_mode: 'Markdown' }
         );
 
-        await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 2);
+        await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 4);
     }
 
     private async handleHelp(ctx: Context): Promise<void> {
@@ -1106,6 +1134,7 @@ export class CoderBot {
             '/1, /2, /3, /4, /5 - Send number keys\n\n' +
             '*Viewing Output:*\n' +
             '/screen - Capture and view terminal screenshot\n' +
+            '/airplane [on|off] - Toggle/check airplane mode (text vs images)\n' +
             '/urls - Show all URLs found in terminal output\n' +
             '/projects - List and select project directories\n' +
             'Click 🔄 Refresh button on screenshots to update\n\n' +
@@ -1128,7 +1157,7 @@ export class CoderBot {
             { parse_mode: 'Markdown' }
         );
 
-        await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 2);
+        await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 4);
     }
 
     private async handleUrls(ctx: Context): Promise<void> {
@@ -1208,7 +1237,7 @@ export class CoderBot {
                 }
             );
 
-            await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+            await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 3);
         } catch (error) {
             await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
         }

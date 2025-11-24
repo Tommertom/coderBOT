@@ -3,11 +3,11 @@ import { XtermService } from '../features/xterm/xterm.service.js';
 import { XtermRendererService } from '../features/xterm/xterm-renderer.service.js';
 import { CoderService } from '../features/coder/coder.service.js';
 import { ConfigService } from './config.service.js';
-import { RefreshStateService } from './refresh-state.service.js';
+import { AirplaneStateService } from './airplane-state.service.js';
 
 export class ServiceContainerFactory {
     private static globalConfig: ConfigService | null = null;
-    private static globalRefreshState: RefreshStateService | null = null;
+    private static globalAirplaneState: AirplaneStateService | null = null;
 
     static create(botId: string): ServiceContainer {
         // Create or reuse the global config service (shared across all bots)
@@ -16,11 +16,11 @@ export class ServiceContainerFactory {
         }
         const configService = ServiceContainerFactory.globalConfig;
 
-        // Create or reuse the global refresh state service (shared across all bots)
-        if (!ServiceContainerFactory.globalRefreshState) {
-            ServiceContainerFactory.globalRefreshState = new RefreshStateService();
+        // Create or reuse the global airplane state service (shared across all bots)
+        if (!ServiceContainerFactory.globalAirplaneState) {
+            ServiceContainerFactory.globalAirplaneState = new AirplaneStateService();
         }
-        const refreshStateService = ServiceContainerFactory.globalRefreshState;
+        const airplaneStateService = ServiceContainerFactory.globalAirplaneState;
 
         const xtermService = new XtermService(configService);
         const xtermRendererService = new XtermRendererService(configService);
@@ -31,7 +31,7 @@ export class ServiceContainerFactory {
             xtermService,
             xtermRendererService,
             coderService,
-            refreshStateService,
+            airplaneStateService,
             async cleanup() {
                 xtermService.cleanup();
                 await xtermRendererService.cleanup();
@@ -46,10 +46,10 @@ export class ServiceContainerFactory {
         return ServiceContainerFactory.globalConfig;
     }
 
-    static getGlobalRefreshState(): RefreshStateService {
-        if (!ServiceContainerFactory.globalRefreshState) {
-            ServiceContainerFactory.globalRefreshState = new RefreshStateService();
+    static getGlobalAirplaneState(): AirplaneStateService {
+        if (!ServiceContainerFactory.globalAirplaneState) {
+            ServiceContainerFactory.globalAirplaneState = new AirplaneStateService();
         }
-        return ServiceContainerFactory.globalRefreshState;
+        return ServiceContainerFactory.globalAirplaneState;
     }
 }

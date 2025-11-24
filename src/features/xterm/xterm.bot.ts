@@ -2,13 +2,14 @@ import { Bot, Context, InputFile, InlineKeyboard } from 'grammy';
 import { XtermService } from './xterm.service.js';
 import { XtermRendererService } from './xterm-renderer.service.js';
 import { ConfigService } from '../../services/config.service.js';
-import { RefreshStateService } from '../../services/refresh-state.service.js';
+import { AirplaneStateService } from '../../services/airplane-state.service.js';
 import { AccessControlMiddleware } from '../../middleware/access-control.middleware.js';
 import { MessageUtils } from '../../utils/message.utils.js';
 import { ErrorUtils } from '../../utils/error.utils.js';
 import { ScreenRefreshUtils } from '../../utils/screen-refresh.utils.js';
 import { CommandMenuUtils } from '../../utils/command-menu.utils.js';
 import { Messages, SuccessMessages, ErrorActions } from '../../constants/messages.js';
+import { TextSanitizationUtils } from '../../utils/text-sanitization.utils.js';
 
 export class XtermBot {
     private bot: Bot | null = null;
@@ -16,7 +17,7 @@ export class XtermBot {
     private xtermService: XtermService;
     private xtermRendererService: XtermRendererService;
     private configService: ConfigService;
-    private refreshStateService: RefreshStateService;
+    private airplaneStateService: AirplaneStateService;
 
     private readonly CTRL_MAPPINGS: Record<string, string> = {
         '@': '\x00',
@@ -71,13 +72,13 @@ export class XtermBot {
         xtermService: XtermService,
         xtermRendererService: XtermRendererService,
         configService: ConfigService,
-        refreshStateService: RefreshStateService
+        airplaneStateService: AirplaneStateService
     ) {
         this.botId = botId;
         this.xtermService = xtermService;
         this.xtermRendererService = xtermRendererService;
         this.configService = configService;
-        this.refreshStateService = refreshStateService;
+        this.airplaneStateService = airplaneStateService;
     }
 
     registerHandlers(bot: Bot): void {
@@ -85,7 +86,7 @@ export class XtermBot {
         bot.command('xterm', AccessControlMiddleware.requireAccess, this.handleXterm.bind(this));
         bot.command('keys', AccessControlMiddleware.requireAccess, this.handleKeys.bind(this));
         bot.command('ctrl', AccessControlMiddleware.requireAccess, this.handleCtrl.bind(this));
-        bot.command('refresh', AccessControlMiddleware.requireAccess, this.handleRefresh.bind(this));
+        bot.command('airplane', AccessControlMiddleware.requireAccess, this.handleAirplane.bind(this));
 
         // Register all special key handlers using the generic method
         Object.keys(this.SPECIAL_KEYS).forEach(keyName => {
@@ -128,7 +129,7 @@ export class XtermBot {
                 this.xtermService,
                 this.xtermRendererService,
                 this.configService,
-                this.refreshStateService
+                this.airplaneStateService
             );
         }
     }
@@ -138,21 +139,38 @@ export class XtermBot {
      */
     private async sendSessionScreenshot(ctx: Context, userId: string): Promise<void> {
         const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
-        const dimensions = this.xtermService.getSessionDimensions(userId);
-
-        const imageBuffer = await this.xtermRendererService.renderToImage(
-            outputBuffer,
-            dimensions.rows,
-            dimensions.cols
-        );
+        const globalDefault = this.configService.isAirplaneModeEnabled();
+        const isAirplaneMode = this.airplaneStateService.isAirplaneEnabled(userId, globalDefault);
 
         const inlineKeyboard = ScreenRefreshUtils.createScreenKeyboard();
 
-        const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
-            reply_markup: inlineKeyboard,
-        });
+        if (isAirplaneMode) {
+            // Airplane mode: send text instead of image
+            const sanitizedText = TextSanitizationUtils.getLastCharactersSanitized(outputBuffer, 1500);
+            const formattedText = TextSanitizationUtils.formatAsCodeBlock(sanitizedText);
 
-        this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
+            const sentMessage = await ctx.reply(formattedText, {
+                parse_mode: 'Markdown',
+                reply_markup: inlineKeyboard,
+            });
+
+            this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
+        } else {
+            // Normal mode: render and send image
+            const dimensions = this.xtermService.getSessionDimensions(userId);
+
+            const imageBuffer = await this.xtermRendererService.renderToImage(
+                outputBuffer,
+                dimensions.rows,
+                dimensions.cols
+            );
+
+            const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
+                reply_markup: inlineKeyboard,
+            });
+
+            this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
+        }
     }
 
     /**
@@ -333,33 +351,25 @@ export class XtermBot {
         });
     }
 
-    private async handleRefresh(ctx: Context): Promise<void> {
+    private async handleAirplane(ctx: Context): Promise<void> {
         const userId = ctx.from!.id.toString();
         const message = ctx.message?.text || '';
-        const args = message.replace('/refresh', '').trim().toLowerCase();
+        const args = message.replace('/airplane', '').trim().toLowerCase();
 
         try {
-            const globalDefault = this.configService.isScreenRefreshEnabled();
-            const currentState = this.refreshStateService.isRefreshEnabled(userId, globalDefault);
-            const intervalSeconds = this.configService.getScreenRefreshInterval() / 1000;
-            const maxCount = this.configService.getScreenRefreshMaxCount();
+            const globalDefault = this.configService.isAirplaneModeEnabled();
+            const currentState = this.airplaneStateService.isAirplaneEnabled(userId, globalDefault);
 
             // No argument - show current state
             if (!args) {
                 const stateText = currentState ? 'ON ✅' : 'OFF ❌';
-                const hasCustom = this.refreshStateService.hasCustomPreference(userId);
-                const customNote = hasCustom ? '\n(Custom preference set)' : '\n(Using global default)';
+                const hasCustom = this.airplaneStateService.hasCustomPreference(userId);
+                const customNote = hasCustom ? ' (Custom)' : ' (Default)';
                 
                 await ctx.reply(
-                    `🔄 *Auto-Refresh Status*\n\n` +
-                    `*Current state:* ${stateText}${customNote}\n` +
-                    `*Interval:* ${intervalSeconds} seconds\n` +
-                    `*Max refreshes:* ${maxCount} times\n` +
-                    `*Total duration:* ${intervalSeconds * maxCount} seconds\n\n` +
-                    `*Usage:*\n` +
-                    `• \`/refresh on\` - Enable auto-refresh\n` +
-                    `• \`/refresh off\` - Disable auto-refresh\n` +
-                    `• \`/refresh\` - Show current status`,
+                    `✈️ *Airplane Mode:* ${stateText}${customNote}\n` +
+                    `When ON: Terminal screenshots sent as text (1500 chars)\n` +
+                    `When OFF: Terminal screenshots sent as images`,
                     { parse_mode: 'Markdown' }
                 );
                 return;
@@ -367,38 +377,25 @@ export class XtermBot {
 
             // Handle on/off argument
             if (args === 'on') {
-                this.refreshStateService.setRefreshEnabled(userId, true);
-                await ctx.reply(
-                    `✅ *Auto-refresh enabled*\n\n` +
-                    `Screens will auto-refresh ${maxCount} times at ${intervalSeconds}s intervals after you send commands.`,
-                    { parse_mode: 'Markdown' }
-                );
+                this.airplaneStateService.setAirplaneEnabled(userId, true);
+                await ctx.reply(`✈️ Airplane mode enabled - Screenshots will be sent as text`);
                 return;
             }
 
             if (args === 'off') {
-                this.refreshStateService.setRefreshEnabled(userId, false);
-                // Also clear any running refresh interval
-                this.xtermService.clearRefreshInterval(userId);
-                await ctx.reply(
-                    `❌ *Auto-refresh disabled*\n\n` +
-                    `Screens will no longer auto-refresh. Use /screen to manually refresh.`,
-                    { parse_mode: 'Markdown' }
-                );
+                this.airplaneStateService.setAirplaneEnabled(userId, false);
+                await ctx.reply(`📷 Airplane mode disabled - Screenshots will be sent as images`);
                 return;
             }
 
             // Invalid argument
             await ctx.reply(
-                `⚠️ Invalid argument: \`${args}\`\n\n` +
-                `*Usage:*\n` +
-                `• \`/refresh on\` - Enable auto-refresh\n` +
-                `• \`/refresh off\` - Disable auto-refresh\n` +
-                `• \`/refresh\` - Show current status`,
+                `⚠️ Invalid argument: \`${args}\`\n` +
+                `Use: /airplane, /airplane on, or /airplane off`,
                 { parse_mode: 'Markdown' }
             );
         } catch (error) {
-            await ctx.reply(ErrorUtils.createErrorMessage('manage refresh settings', error));
+            await ctx.reply(ErrorUtils.createErrorMessage('manage airplane mode settings', error));
         }
     }
 
@@ -410,13 +407,8 @@ export class XtermBot {
                 const statusMsg = await ctx.reply(Messages.CAPTURING_SCREEN);
 
                 const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
-                const dimensions = this.xtermService.getSessionDimensions(userId);
-
-                const imageBuffer = await this.xtermRendererService.renderToImage(
-                    outputBuffer,
-                    dimensions.rows,
-                    dimensions.cols
-                );
+                const globalDefault = this.configService.isAirplaneModeEnabled();
+                const isAirplaneMode = this.airplaneStateService.isAirplaneEnabled(userId, globalDefault);
 
                 try {
                     await ctx.api.deleteMessage(ctx.chat!.id, statusMsg.message_id);
@@ -426,11 +418,33 @@ export class XtermBot {
 
                 const keyboard = ScreenRefreshUtils.createScreenKeyboard();
 
-                const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
-                    reply_markup: keyboard,
-                });
+                if (isAirplaneMode) {
+                    // Airplane mode: send text instead of image
+                    const sanitizedText = TextSanitizationUtils.getLastCharactersSanitized(outputBuffer, 1500);
+                    const formattedText = TextSanitizationUtils.formatAsCodeBlock(sanitizedText);
 
-                this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
+                    const sentMessage = await ctx.reply(formattedText, {
+                        parse_mode: 'Markdown',
+                        reply_markup: keyboard,
+                    });
+
+                    this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
+                } else {
+                    // Normal mode: render and send image
+                    const dimensions = this.xtermService.getSessionDimensions(userId);
+
+                    const imageBuffer = await this.xtermRendererService.renderToImage(
+                        outputBuffer,
+                        dimensions.rows,
+                        dimensions.cols
+                    );
+
+                    const sentMessage = await ctx.replyWithPhoto(new InputFile(imageBuffer), {
+                        reply_markup: keyboard,
+                    });
+
+                    this.xtermService.setLastScreenshotMessageId(userId, sentMessage.message_id);
+                }
             } catch (error) {
                 await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.CAPTURE_SCREEN, error));
             }
@@ -458,23 +472,38 @@ export class XtermBot {
                 await this.safeAnswerCallbackQuery(ctx, Messages.REFRESHING);
 
                 const outputBuffer = this.xtermService.getSessionOutputBuffer(userId);
-                const dimensions = this.xtermService.getSessionDimensions(userId);
-
-                const imageBuffer = await this.xtermRendererService.renderToImage(
-                    outputBuffer,
-                    dimensions.rows,
-                    dimensions.cols
-                );
+                const globalDefault = this.configService.isAirplaneModeEnabled();
+                const isAirplaneMode = this.airplaneStateService.isAirplaneEnabled(userId, globalDefault);
 
                 const keyboard = ScreenRefreshUtils.createScreenKeyboard();
 
                 if (ctx.callbackQuery?.message) {
-                    await ctx.editMessageMedia({
-                        type: 'photo',
-                        media: new InputFile(imageBuffer),
-                    }, {
-                        reply_markup: keyboard,
-                    });
+                    if (isAirplaneMode) {
+                        // Airplane mode: edit message text
+                        const sanitizedText = TextSanitizationUtils.getLastCharactersSanitized(outputBuffer, 1500);
+                        const formattedText = TextSanitizationUtils.formatAsCodeBlock(sanitizedText);
+
+                        await ctx.editMessageText(formattedText, {
+                            parse_mode: 'Markdown',
+                            reply_markup: keyboard,
+                        });
+                    } else {
+                        // Normal mode: edit with image
+                        const dimensions = this.xtermService.getSessionDimensions(userId);
+
+                        const imageBuffer = await this.xtermRendererService.renderToImage(
+                            outputBuffer,
+                            dimensions.rows,
+                            dimensions.cols
+                        );
+
+                        await ctx.editMessageMedia({
+                            type: 'photo',
+                            media: new InputFile(imageBuffer),
+                        }, {
+                            reply_markup: keyboard,
+                        });
+                    }
                 }
 
                 // Trigger auto-refresh interval

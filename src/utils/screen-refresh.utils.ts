@@ -2,7 +2,8 @@ import { Bot, InputFile, InlineKeyboard } from 'grammy';
 import { XtermService } from '../features/xterm/xterm.service.js';
 import { XtermRendererService } from '../features/xterm/xterm-renderer.service.js';
 import { ConfigService } from '../services/config.service.js';
-import { RefreshStateService } from '../services/refresh-state.service.js';
+import { AirplaneStateService } from '../services/airplane-state.service.js';
+import { TextSanitizationUtils } from './text-sanitization.utils.js';
 
 export class ScreenRefreshUtils {
     /**
@@ -29,16 +30,8 @@ export class ScreenRefreshUtils {
         xtermService: XtermService,
         xtermRendererService: XtermRendererService,
         configService: ConfigService,
-        refreshStateService: RefreshStateService
+        airplaneStateService: AirplaneStateService
     ): void {
-        // Check if refresh is enabled for this user
-        const globalDefault = configService.isScreenRefreshEnabled();
-        const isEnabled = refreshStateService.isRefreshEnabled(userId, globalDefault);
-        
-        if (!isEnabled) {
-            return;
-        }
-
         const REFRESH_INTERVAL_MS = configService.getScreenRefreshInterval();
         const MAX_REFRESH_COUNT = configService.getScreenRefreshMaxCount();
         // Check if refresh is already running
@@ -95,23 +88,47 @@ export class ScreenRefreshUtils {
                 // Update hash for next comparison
                 lastBufferHash = currentBufferHash;
 
-                // Render and update the screenshot
-                const dimensions = xtermService.getSessionDimensions(userId);
+                // Check if airplane mode is enabled for this user
+                const globalAirplaneDefault = configService.isAirplaneModeEnabled();
+                const isAirplaneMode = airplaneStateService.isAirplaneEnabled(userId, globalAirplaneDefault);
 
-                const imageBuffer = await xtermRendererService.renderToImage(
-                    outputBuffer,
-                    dimensions.rows,
-                    dimensions.cols
-                );
+                if (isAirplaneMode) {
+                    // Airplane mode: send text instead of image
+                    const sanitizedText = TextSanitizationUtils.getLastCharactersSanitized(outputBuffer, 1500);
+                    const formattedText = TextSanitizationUtils.formatAsCodeBlock(sanitizedText);
+                    
+                    const keyboard = ScreenRefreshUtils.createScreenKeyboard();
 
-                const keyboard = ScreenRefreshUtils.createScreenKeyboard();
+                    try {
+                        await bot.api.editMessageText(chatId, lastMessageId, formattedText, {
+                            parse_mode: 'Markdown',
+                            reply_markup: keyboard,
+                        });
+                    } catch (error) {
+                        // If editing text fails (e.g., message was a photo), send new message
+                        console.error('Failed to edit message as text, this is expected on first conversion:', error);
+                        xtermService.clearRefreshInterval(userId);
+                        return;
+                    }
+                } else {
+                    // Normal mode: render and send image
+                    const dimensions = xtermService.getSessionDimensions(userId);
 
-                await bot.api.editMessageMedia(chatId, lastMessageId, {
-                    type: 'photo',
-                    media: new InputFile(imageBuffer),
-                }, {
-                    reply_markup: keyboard,
-                });
+                    const imageBuffer = await xtermRendererService.renderToImage(
+                        outputBuffer,
+                        dimensions.rows,
+                        dimensions.cols
+                    );
+
+                    const keyboard = ScreenRefreshUtils.createScreenKeyboard();
+
+                    await bot.api.editMessageMedia(chatId, lastMessageId, {
+                        type: 'photo',
+                        media: new InputFile(imageBuffer),
+                    }, {
+                        reply_markup: keyboard,
+                    });
+                }
 
                 // Update the session's buffer hash to keep it in sync
                 xtermService.setLastScreenshotBufferHash(userId, currentBufferHash);
