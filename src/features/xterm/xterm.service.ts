@@ -1,4 +1,5 @@
 import * as pty from 'node-pty';
+import * as fs from 'fs';
 import { PtySession, XtermConfig } from './xterm.types.js';
 import { ConfigService } from '../../services/config.service.js';
 
@@ -124,6 +125,26 @@ export class XtermService {
         await new Promise(resolve => setTimeout(resolve, waitMs));
 
         return session.output.join('');
+    }
+
+    async getSessionCwd(userId: string): Promise<string> {
+        const session = this.sessions.get(this.getSessionKey(userId));
+        if (!session) {
+            throw new Error('No active session found');
+        }
+
+        try {
+            const pid = session.pty.pid;
+            if (!pid) {
+                return process.cwd();
+            }
+            // Read /proc/[pid]/cwd to get the current working directory of the shell process
+            const cwd = await fs.promises.readlink(`/proc/${pid}/cwd`);
+            return cwd;
+        } catch (error) {
+            console.error(`Failed to get CWD for session ${userId}:`, error);
+            return process.cwd();
+        }
     }
 
     getSessionOutputBuffer(userId: string): string[] {

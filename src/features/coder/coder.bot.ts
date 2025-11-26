@@ -1299,7 +1299,17 @@ export class CoderBot {
 
     private async handleMd(ctx: Context): Promise<void> {
         try {
-            const cwd = process.cwd();
+            const userId = ctx.from!.id.toString();
+            let cwd = process.cwd();
+
+            // Try to get the current working directory from the active session
+            if (this.xtermService.hasSession(userId)) {
+                try {
+                    cwd = await this.xtermService.getSessionCwd(userId);
+                } catch (error) {
+                    console.warn(`Failed to get session CWD for user ${userId}, falling back to default:`, error);
+                }
+            }
             
             // Find all .md files recursively
             const findMdFiles = async (dir: string): Promise<Array<{ path: string; mtime: Date }>> => {
