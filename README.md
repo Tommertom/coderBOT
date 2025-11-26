@@ -55,6 +55,7 @@ coderbot
 - 🔗 **Automatic URL Notifications**: URLs detected in terminal output are automatically sent as messages and auto-deleted
 - 🔍 **URL Tracking**: Manually view all discovered URLs with the `/urls` command
 - 📁 **Project Navigation**: Quick directory switching with `/projects` command (lists home directory projects)
+- 📄 **Markdown File Viewer**: Quick access to recent markdown files with `/md` command
 - ⚡ **Quick Commands**: Dot prefix (`.command`) for faster command entry
 - 🎮 **ControlBOT**: Administrative bot for managing worker processes (start/stop bots, add/remove tokens, monitor health)
 
@@ -367,6 +368,7 @@ Common examples:
 - `/refresh off` - Disable automatic screen refreshes
 - `/urls` - Show all URLs discovered in terminal output
 - `/projects` - List and select project directories from home directory
+- `/md` - Show 5 most recently updated markdown files with clickable menu
 - `/macros` - Show all configured message placeholders (m0-m9) and their values
 - Click **🔄 Refresh** button on screenshots to update the view
 

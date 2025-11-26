@@ -593,7 +593,7 @@ export class XtermBot {
 
             this.xtermService.writeRawToSession(userId, text);
 
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise(resolve => setTimeout(resolve, 100));
 
             this.xtermService.writeRawToSession(userId, '\r');
 

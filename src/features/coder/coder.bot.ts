@@ -89,6 +89,7 @@ export class CoderBot {
         bot.command('urls', AccessControlMiddleware.requireAccess, this.handleUrls.bind(this));
         bot.command('projects', AccessControlMiddleware.requireAccess, this.handleProjects.bind(this));
         bot.command('macros', AccessControlMiddleware.requireAccess, this.handleMacros.bind(this));
+        bot.command('md', AccessControlMiddleware.requireAccess, this.handleMd.bind(this));
         bot.on('callback_query:data', AccessControlMiddleware.requireAccess, this.handleCallbackQuery.bind(this));
         bot.on('message:photo', AccessControlMiddleware.requireAccess, this.handlePhoto.bind(this));
         bot.on('message:video', AccessControlMiddleware.requireAccess, this.handleVideo.bind(this));
@@ -355,6 +356,41 @@ export class CoderBot {
                     await ctx.deleteMessage();
                 }
                 this.triggerAutoRefresh(userId, chatId);
+                return;
+            }
+
+            // Handle markdown file selection
+            if (callbackData.startsWith('md:')) {
+                const filePath = callbackData.substring(3);
+                if (filePath === 'cancel') {
+                    await this.safeAnswerCallbackQuery(ctx, '❌ Cancelled');
+                    if (ctx.callbackQuery?.message) {
+                        await ctx.deleteMessage();
+                    }
+                    return;
+                }
+                
+                try {
+                    const fileName = path.basename(filePath);
+                    
+                    // Delete the menu message
+                    if (ctx.callbackQuery?.message) {
+                        await ctx.deleteMessage();
+                    }
+                    
+                    // Send the file as a document
+                    await ctx.replyWithDocument(new InputFile(filePath), {
+                        caption: `📄 ${fileName}`
+                    });
+                    
+                    await this.safeAnswerCallbackQuery(ctx, `✅ Sent: ${fileName}`);
+                } catch (error) {
+                    console.error('Failed to send markdown file:', error);
+                    await this.safeAnswerCallbackQuery(ctx, `❌ Failed to send file`);
+                    if (ctx.callbackQuery?.message) {
+                        await ctx.deleteMessage();
+                    }
+                }
                 return;
             }
 
@@ -628,7 +664,7 @@ export class CoderBot {
 
             this.xtermService.writeRawToSession(userId, processedText);
 
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
             this.xtermService.writeRawToSession(userId, '\r');
 
@@ -1137,6 +1173,7 @@ export class CoderBot {
             '/airplane [on|off] - Toggle/check airplane mode (text vs images)\n' +
             '/urls - Show all URLs found in terminal output\n' +
             '/projects - List and select project directories\n' +
+            '/md - Show 5 most recently updated markdown files\n' +
             'Click 🔄 Refresh button on screenshots to update\n\n' +
             '*Media Upload & Download:*\n' +
             '• *Supported Upload Types:*\n' +
@@ -1255,6 +1292,82 @@ export class CoderBot {
 
             const sentMsg = await ctx.reply(message, { parse_mode: 'Markdown' });
             await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+        } catch (error) {
+            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
+        }
+    }
+
+    private async handleMd(ctx: Context): Promise<void> {
+        try {
+            const cwd = process.cwd();
+            
+            // Find all .md files recursively
+            const findMdFiles = async (dir: string): Promise<Array<{ path: string; mtime: Date }>> => {
+                const results: Array<{ path: string; mtime: Date }> = [];
+                
+                const processDir = async (currentDir: string): Promise<void> => {
+                    const entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
+                    
+                    for (const entry of entries) {
+                        const fullPath = path.join(currentDir, entry.name);
+                        
+                        // Skip hidden directories and common ignore patterns
+                        if (entry.name.startsWith('.') || entry.name === 'node_modules') {
+                            continue;
+                        }
+                        
+                        if (entry.isDirectory()) {
+                            await processDir(fullPath);
+                        } else if (entry.isFile() && entry.name.endsWith('.md')) {
+                            const stats = await fs.promises.stat(fullPath);
+                            results.push({ path: fullPath, mtime: stats.mtime });
+                        }
+                    }
+                };
+                
+                await processDir(dir);
+                return results;
+            };
+            
+            const mdFiles = await findMdFiles(cwd);
+            
+            if (mdFiles.length === 0) {
+                const sentMsg = await ctx.reply(
+                    '📄 *No Markdown Files Found*\n\n' +
+                    `No .md files found in ${cwd}`,
+                    { parse_mode: 'Markdown' }
+                );
+                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
+                return;
+            }
+            
+            // Sort by modification time (newest first) and take top 5
+            const recentFiles = mdFiles
+                .sort((a, b) => b.mtime.getTime() - a.mtime.getTime())
+                .slice(0, 5);
+            
+            const keyboard = new InlineKeyboard();
+            
+            recentFiles.forEach((file, index) => {
+                const relativePath = path.relative(cwd, file.path);
+                const displayName = relativePath.length > 40 
+                    ? '...' + relativePath.slice(-37) 
+                    : relativePath;
+                keyboard.text(displayName, `md:${file.path}`);
+                keyboard.row();
+            });
+            
+            keyboard.text('❌ Cancel', 'md:cancel');
+            
+            const sentMsg = await ctx.reply(
+                `📄 *Recent Markdown Files* (${recentFiles.length})\n\nSelect a file to view its content:`,
+                {
+                    parse_mode: 'Markdown',
+                    reply_markup: keyboard
+                }
+            );
+            
+            await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 3);
         } catch (error) {
             await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
         }
