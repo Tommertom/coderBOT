@@ -62,6 +62,7 @@ RUN (type -p wget >/dev/null || (apt update && apt install wget -y)) \
     && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g @github/copilot@latest
+RUN npm install -g opencode-ai@latest
 RUN npm install -g npm@latest
 
 # Create working directory
