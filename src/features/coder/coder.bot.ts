@@ -638,7 +638,6 @@ export class CoderBot {
                     this.xtermService,
                     this.xtermRendererService,
                     this.configService,
-                    this.refreshStateService,
                     this.airplaneStateService
                 );
             }
