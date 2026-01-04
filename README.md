@@ -221,29 +221,7 @@ TELEGRAM_BOT_TOKENS=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz,0987654321:XYZabcDEFgh
 
 ### Installation Methods
 
-**Method 1: NPX (Recommended - No installation needed)**
-
-```bash
-# Run directly without installation
-npx @tommertom/coderbot@latest
-
-# On first run, it creates .env file
-# Edit .env with your configuration
-# Run again to start the bot
-npx @tommertom/coderbot@latest
-```
-
-**Method 2: Global Installation**
-
-```bash
-# Install globally
-npm install -g @tommertom/coderbot
-
-# Run from anywhere
-coderbot
-```
-
-**Method 3: Docker (Automated Script - Isolated Environment)**
+**Method 1: Docker (Automated Script - Isolated Environment)**
 
 Use the automated Docker deployment script for a fully isolated, production-ready environment:
 
@@ -266,7 +244,7 @@ This script automatically:
 
 **See [Docker Runner Documentation](docs/docker-runner-script.md) for detailed instructions.**
 
-**Method 4: Docker (Manual - Using Existing Dockerfile)**
+**Method 2: Docker (Manual - Using Existing Dockerfile)**
 
 ```bash
 # Build the image
@@ -279,35 +257,11 @@ docker run -d --name coderbot \
   coderbot
 ```
 
-### Configuration
-
-After installation, edit the `.env` file in your current directory:
-
-```bash
-# The .env file is created automatically on first run
-# Edit it with your favorite text editor
-nano .env
-# or
-vim .env
-# or
-code .env
-```
-
-**Required configuration:**
-- `TELEGRAM_BOT_TOKENS` - Your bot token(s) from [@BotFather](https://t.me/botfather)
-- `ALLOWED_USER_IDS` - Your Telegram user ID(s)
-
 ### Prerequisites: Authenticating AI Coding Tools
 
 **Important:** Before you can use the AI coding assistants (`/copilot`, `/claude`, `/gemini`, `/gemini`), you must first authenticate these tools on the server where the bot is running.
 Do this by manually running each tool in a terminal to complete their authentication flow.
 Include authentication for Git and GitHub CLI as well, since most AI tools depend on them.
-
-**Supported AI Assistants:**
-- **GitHub Copilot CLI** - Requires GitHub CLI (`gh`) authentication and Copilot subscription
-- **Claude AI** - Requires Anthropic API key or Claude CLI authentication
-- **Google Gemini** - Requires Google AI Studio API key or Gemini CLI authentication
-- **Gemini CLI** - Requires Gemini IDE installation and authentication
 
 ## Commands
 
@@ -797,7 +751,7 @@ The directories are automatically created on bot startup if they don't exist.
 **Issue**: Bot fails to start
 
 **Solutions**:
-1. Ensure you're using the latest version: `npx @tommertom/coderbot@latest@latest`
+1. Ensure you're using the latest version: `npx @tommertom/coderbot@latest`
 2. Check Node.js version is compatible (v18+ required)
 3. Verify `.env` file has correct syntax
 4. Check for specific error messages in the output
