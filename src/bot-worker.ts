@@ -1,6 +1,8 @@
 import { Bot } from "grammy";
 import { XtermBot } from './features/xterm/xterm.bot.js';
 import { CoderBot } from './features/coder/coder.bot.js';
+import { AudioBot } from './features/audio/audio.bot.js';
+import { AudioService } from './features/audio/audio.service.js';
 import { ServiceContainerFactory } from './services/service-container.factory.js';
 import { createMediaWatcherService } from './features/media/media-watcher.service.js';
 import { AccessControlMiddleware } from './middleware/access-control.middleware.js';
@@ -58,6 +60,9 @@ const services = ServiceContainerFactory.create(botId);
 // Initialize media watcher with bot-specific directory
 const mediaWatcherService = createMediaWatcherService(configService, botId);
 
+// Declare audioBot at module level for cleanup access
+let audioBot: AudioBot | null = null;
+
 async function startWorker() {
     try {
         console.log(`[Worker ${botId}] Starting initialization...`);
@@ -97,6 +102,16 @@ async function startWorker() {
             services.configService,
             services.airplaneStateService
         );
+
+        // Initialize audio bot if STT is configured
+        if (configService.hasTtsApiKey()) {
+            const audioService = new AudioService(configService);
+            audioBot = new AudioBot(botId, audioService, configService);
+            await audioBot.initialize(bot);
+            console.log(`[Worker ${botId}] Audio transcription initialized (Provider: ${configService.detectTtsProvider()})`);
+        } else {
+            console.log(`[Worker ${botId}] Audio transcription disabled (no TTS_API_KEY configured)`);
+        }
 
         // Register handlers - CoderBot first for general commands, then XtermBot for specific ones
         coderBot.registerHandlers(bot);
@@ -217,6 +232,11 @@ async function gracefulShutdown(signal: string): Promise<void> {
 
     try {
         sendStatusUpdate('stopping');
+
+        // Cleanup audio bot if initialized
+        if (audioBot) {
+            await audioBot.cleanup();
+        }
 
         // Cleanup media watcher
         mediaWatcherService.cleanup();

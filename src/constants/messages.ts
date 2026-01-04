@@ -21,6 +21,9 @@ export const Messages = {
     REFRESHING: '🔄 Refreshing...',
     CAPTURING_SCREEN: '📸 Capturing terminal screen...',
     SPAWNING_SESSION: '🚀 Spawning now...',
+
+    // Audio transcription messages
+    TRANSCRIBING_AUDIO: '🎙️ Transcribing audio...',
 } as const;
 
 /**
@@ -53,4 +56,36 @@ export const ErrorActions = {
     SEND_KEYS: 'send keys',
     CAPTURE_SCREEN: 'capture terminal screen',
     CREATE_TERMINAL: 'create terminal session',
+    TRANSCRIBE_AUDIO: 'transcribe audio',
+} as const;
+
+/**
+ * Audio transcription error messages
+ */
+export const AudioErrors = {
+    NO_API_KEY_CONFIGURED: '⚠️ Audio transcription is not configured.\n\n' +
+        'Please set TTS_API_KEY in your .env file with either:\n' +
+        '• OpenAI API key (sk-...)\n' +
+        '• Google Gemini API key',
+    
+    INVALID_API_KEY: '❌ Invalid API key.\n\n' +
+        'Please check your TTS_API_KEY configuration.',
+    
+    TRANSCRIPTION_FAILED: '❌ Failed to transcribe audio.\n\n' +
+        'Please try again or check your API key and quota.',
+    
+    UNSUPPORTED_FORMAT: '⚠️ Unsupported audio format.\n\n' +
+        'Supported formats: .ogg, .mp3, .wav, .webm, .m4a, .flac, .opus',
+    
+    FILE_TOO_LARGE: '⚠️ Audio file is too large.\n\n' +
+        'Maximum size: 25MB',
+    
+    DOWNLOAD_FAILED: '❌ Failed to download audio file from Telegram.\n\n' +
+        'Please try sending the audio again.',
+    
+    RATE_LIMIT: '⚠️ API rate limit exceeded.\n\n' +
+        'Please wait a moment and try again.',
+    
+    QUOTA_EXCEEDED: '❌ API quota exceeded.\n\n' +
+        'Please check your API account billing and limits.',
 } as const;

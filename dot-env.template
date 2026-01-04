@@ -109,6 +109,17 @@ M7=
 M8=
 M9=
 
+# ============================================================================
+# Audio Transcription (Speech-to-Text) Configuration (Optional)
+# ============================================================================
+# API key for audio transcription service
+# Supports OpenAI Whisper API (keys starting with "sk-") and Google Gemini API
+# The bot will auto-detect which service to use based on the key format
+# Leave empty to disable audio transcription feature
+# OpenAI example: TTS_API_KEY=sk-proj-abcd1234...
+# Gemini example: TTS_API_KEY=AIzaSy...
+TTS_API_KEY=
+
 #
 # CUSTOM ENV - not specific to coderBOT
 # Place here your custom environment variables if needed

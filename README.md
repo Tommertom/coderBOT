@@ -15,6 +15,34 @@ A Telegram bot that provides interactive terminal sessions with support for AI c
 - ✨ **Google Gemini** - Google's multimodal AI model
 - 🔧 **Any CLI tool** - Works with any command-line AI assistant
 
+## Bot in Action
+
+See how CoderBot works with these interactive examples:
+
+<p align="center">
+  <img src="images/screenshot1.gif" alt="CoderBot Demo 1" width="600"/>
+  <br/>
+  <em>Starting a session and interacting with the terminal</em>
+</p>
+
+<p align="center">
+  <img src="images/screenshot2.gif" alt="CoderBot Demo 2" width="600"/>
+  <br/>
+  <em>Using AI coding assistants through Telegram</em>
+</p>
+
+<p align="center">
+  <img src="images/screenshot3.gif" alt="CoderBot Demo 3" width="600"/>
+  <br/>
+  <em>Terminal screenshot functionality</em>
+</p>
+
+<p align="center">
+  <img src="images/screenshot4.gif" alt="CoderBot Demo 4" width="600"/>
+  <br/>
+  <em>Managing sessions and commands</em>
+</p>
+
 ## Quick Start
 
 **Run instantly with npx (recommended):**
@@ -46,6 +74,7 @@ coderbot
 
 - 🖥️ **Interactive Terminal**: Full xterm terminal access via Telegram with PTY support
 - 🤖 **AI Coding Assistant Support**: Native integration with GitHub Copilot CLI, OpenCode, Google Gemini, or any command-line AI tool
+- 🎙️ **Audio Transcription**: Convert voice messages and audio files to text using OpenAI Whisper or Google Gemini (optional, see [Audio Transcription docs](docs/audio-transcription-feature.md))
 - 🔐 **Robust Access Control**: Environment-based user authentication with optional auto-kill on unauthorized access
 - 📸 **Terminal Screenshots**: Real-time visual feedback with terminal screen captures using Puppeteer
 - 🔄 **Auto-Refresh**: Configurable automatic screen refreshes after commands with per-user on/off control

@@ -42,6 +42,9 @@ export class ConfigService {
     // Airplane Mode Configuration
     private readonly airplaneMode: boolean;
 
+    // Speech-to-Text Configuration
+    private readonly ttsApiKey: string | undefined;
+
     // Message Placeholders
     private readonly mPlaceholders: Map<number, string>;
 
@@ -110,6 +113,9 @@ export class ConfigService {
         // Load airplane mode configuration (default: false)
         const airplaneModeValue = process.env.AIRPLANE_MODE?.toLowerCase();
         this.airplaneMode = airplaneModeValue === 'true' || airplaneModeValue === '1' || airplaneModeValue === 'on';
+
+        // Load speech-to-text configuration
+        this.ttsApiKey = process.env.TTS_API_KEY?.trim() || undefined;
 
         // Load message placeholders (M0-M9)
         this.mPlaceholders = new Map();
@@ -214,6 +220,30 @@ export class ConfigService {
         return this.airplaneMode;
     }
 
+    // Speech-to-Text Configuration Getters
+    getTtsApiKey(): string | undefined {
+        return this.ttsApiKey;
+    }
+
+    hasTtsApiKey(): boolean {
+        return !!this.ttsApiKey && this.ttsApiKey.length > 0;
+    }
+
+    detectTtsProvider(): 'openai' | 'gemini' | null {
+        if (!this.ttsApiKey) {
+            return null;
+        }
+        
+        // OpenAI keys start with "sk-"
+        if (this.ttsApiKey.startsWith('sk-')) {
+            return 'openai';
+        }
+        
+        // Gemini keys typically start with "AIza" or are alphanumeric
+        // If it doesn't match OpenAI pattern, assume Gemini
+        return 'gemini';
+    }
+
     // Message Placeholder Getters
     getMPlaceholder(index: number): string | undefined {
         return this.mPlaceholders.get(index);
@@ -260,12 +290,13 @@ export class ConfigService {
   - Media Location: ${this.mediaTmpLocation}
   - Clean Up Media Dir: ${this.cleanUpMediaDir}
   - Message Delete Timeout: ${this.messageDeleteTimeout}ms
-  - Auto Notify URLs: ${this.autoNotifyUrls}
   - Screen Refresh Interval: ${this.screenRefreshInterval}ms
   - Screen Refresh Max Count: ${this.screenRefreshMaxCount}
   - Bot Token Monitor Interval: ${this.botTokenMonitorInterval}ms
   - Control Bot Enabled: ${this.hasControlBot()}
   - Control Bot Admins: ${this.controlBotAdminIds.length}
-  - Airplane Mode: ${this.airplaneMode}`;
+  - Airplane Mode: ${this.airplaneMode}
+  - TTS Enabled: ${this.hasTtsApiKey()}
+  - TTS Provider: ${this.detectTtsProvider() || 'none'}`;
     }
 }
