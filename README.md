@@ -7,13 +7,12 @@
 [![npm version](https://badge.fury.io/js/@tommertom%2Fcoderbot.svg)](https://www.npmjs.com/package/@tommertom/coderbot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A Telegram bot that provides interactive terminal sessions with support for AI coding assistants (GitHub Copilot CLI, Claude AI, Google Gemini, Gemini, or any CLI-based AI tool). Run it instantly with `npx` or install it globally.
+A Telegram bot that provides interactive terminal sessions with support for AI coding assistants (GitHub Copilot CLI, OpenCode, Google Gemini, or any CLI-based AI tool). Run it instantly with `npx` or install it globally.
 
 **Powered by the best AI coding assistants:**
 - 🤖 **GitHub Copilot CLI** - GitHub's AI pair programmer
-- 🧠 **Claude AI** - Anthropic's advanced AI assistant
+- 🚀 **OpenCode** - Open-source AI coding assistant
 - ✨ **Google Gemini** - Google's multimodal AI model
-- 🎯 **Gemini** - AI-first code editor CLI
 - 🔧 **Any CLI tool** - Works with any command-line AI assistant
 
 ## Quick Start
@@ -44,7 +43,7 @@ coderbot
 ## Features
 
 - 🖥️ **Interactive Terminal**: Full xterm terminal access via Telegram with PTY support
-- 🤖 **AI Coding Assistant Support**: Native integration with GitHub Copilot CLI, Claude AI, Google Gemini, Gemini CLI, or any command-line AI tool
+- 🤖 **AI Coding Assistant Support**: Native integration with GitHub Copilot CLI, OpenCode, Google Gemini, or any command-line AI tool
 - 🔐 **Robust Access Control**: Environment-based user authentication with optional auto-kill on unauthorized access
 - 📸 **Terminal Screenshots**: Real-time visual feedback with terminal screen captures using Puppeteer
 - 🔄 **Auto-Refresh**: Configurable automatic screen refreshes after commands with per-user on/off control
@@ -52,10 +51,6 @@ coderbot
 - ⌨️ **Full Keyboard Control**: Send any key combination including all control characters (Ctrl+A through Ctrl+Z, special keys)
 - 🔄 **Session Management**: Multiple concurrent sessions with automatic timeout handling
 - 🎯 **Interactive Menu Support**: Number key support for navigating CLI tool menus
-- 🔗 **Automatic URL Notifications**: URLs detected in terminal output are automatically sent as messages and auto-deleted
-- 🔍 **URL Tracking**: Manually view all discovered URLs with the `/urls` command
-- 📁 **Project Navigation**: Quick directory switching with `/projects` command (lists home directory projects)
-- 📄 **Markdown File Viewer**: Quick access to recent markdown files with `/md` command
 - ⚡ **Quick Commands**: Dot prefix (`.command`) for faster command entry
 - 🎮 **ControlBOT**: Administrative bot for managing worker processes (start/stop bots, add/remove tokens, monitor health)
 
@@ -117,11 +112,6 @@ CLEAN_UP_MEDIADIR=false
 # Time in milliseconds before auto-deleting confirmation messages (default: 10000 = 10 seconds)
 # Set to 0 to disable auto-deletion
 MESSAGE_DELETE_TIMEOUT=10000
-
-# Automatically notify when URLs are detected in terminal output (default: true)
-# URLs are sent as messages with backticks and deleted after MESSAGE_DELETE_TIMEOUT
-# Set to false to disable automatic URL notifications (manual viewing via /urls still works)
-AUTO_NOTIFY_URLS=true
 
 # Auto-refresh Configuration (Optional)
 # Automatically refresh the last shown terminal screenshot after sending commands
@@ -213,7 +203,7 @@ TELEGRAM_BOT_TOKENS=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz,0987654321:XYZabcDEFgh
 
 **Example Workflow:**
 1. User starts `/copilot` on Bot 1 → Opens Copilot session on Bot 1
-2. User starts `/claude` on Bot 2 → Opens Claude session on Bot 2
+2. User starts `/opencode` on Bot 2 → Opens OpenCode session on Bot 2
 3. Both sessions run independently without interference
 4. If Bot 1 crashes, Bot 2 continues running and Bot 1 auto-restarts
 
@@ -259,7 +249,7 @@ docker run -d --name coderbot \
 
 ### Prerequisites: Authenticating AI Coding Tools
 
-**Important:** Before you can use the AI coding assistants (`/copilot`, `/claude`, `/gemini`, `/gemini`), you must first authenticate these tools on the server where the bot is running.
+**Important:** Before you can use the AI coding assistants (`/copilot`, `/opencode`, `/gemini`), you must first authenticate these tools on the server where the bot is running.
 Do this by manually running each tool in a terminal to complete their authentication flow.
 Include authentication for Git and GitHub CLI as well, since most AI tools depend on them.
 
@@ -267,10 +257,9 @@ Include authentication for Git and GitHub CLI as well, since most AI tools depen
 
 ### Session Management
 - `/start` - Show quick start guide
-- `/copilot [directory]` - Start session with GitHub Copilot CLI
-- `/claude [directory]` - Start session with Claude AI
-- `/gemini [directory]` - Start session with Google Gemini
-- `/gemini [directory]` - Start session with Gemini CLI
+- `/copilot` - Start session with GitHub Copilot CLI
+- `/opencode` - Start session with OpenCode
+- `/gemini` - Start session with Gemini CLI
   - **Optional**: Provide a directory path to cd into before starting the AI assistant
   - Example: `/copilot /home/user/myproject`
 - `/xterm` - Start raw bash terminal session (no AI assistant)
@@ -320,8 +309,6 @@ Common examples:
 - `/refresh` - Show auto-refresh status and configuration
 - `/refresh on` - Enable automatic screen refreshes after commands
 - `/refresh off` - Disable automatic screen refreshes
-- `/urls` - Show all URLs discovered in terminal output
-- `/projects` - List and select project directories from home directory
 - `/md` - Show 5 most recently updated markdown files with clickable menu
 - `/macros` - Show all configured message placeholders (m0-m9) and their values
 - Click **🔄 Refresh** button on screenshots to update the view
@@ -339,35 +326,6 @@ Send commands quickly by prefixing with a dot:
 .npm start       → sends: npm start + Enter
 ```
 The dot is removed and Enter is automatically pressed. This is faster than typing `/send` every time.
-
-### URL Tracking
-The bot automatically captures all URLs from terminal output:
-```
-You: .npm run dev
-Bot: [Terminal shows: Server running at http://localhost:3000]
-
-You: /urls
-Bot: 🔗 Discovered URLs (1)
-     `http://localhost:3000`
-```
-URLs persist throughout the session and can be retrieved anytime with `/urls`.
-
-### Project Navigation
-Quickly navigate to project directories in your home folder:
-```
-You: /projects
-Bot: 📁 Select a Project (5)
-     Choose a directory to navigate to:
-     
-     [coderBOT] [myapp]
-     [website] [scripts]
-     [documents]
-     [❌ Cancel]
-```
-- Lists all non-hidden directories in your home directory
-- Click a button to `cd` into that directory
-- Message auto-deletes at default timeout interval
-- Click Cancel to dismiss without action
 
 ### Message Placeholders
 Create shortcuts for frequently used commands by configuring `M0` through `M9` in your `.env` file:
@@ -697,7 +655,7 @@ The directories are automatically created on bot startup if they don't exist.
 **Issue**: Commands not working or "No active session" error
 
 **Solutions**:
-1. Start a session first: `/copilot`, `/claude`, `/gemini`, or `/xterm`
+1. Start a session first: `/copilot`, `/opencode`, `/gemini`, or `/xterm`
 2. Check if session timed out (see `XTERM_SESSION_TIMEOUT`)
 3. Close and restart session: `/close` then start new session
 4. Check logs for session errors
@@ -771,20 +729,18 @@ The directories are automatically created on bot startup if they don't exist.
 
 ### AI Assistant Not Starting
 
-**Issue**: `/copilot`, `/claude`, `/gemini`, or `/gemini` command doesn't start the AI
+**Issue**: `/copilot`, `/opencode`, or `/gemini` command doesn't start the AI
 
 **Solutions**:
 1. Ensure the CLI tool is installed on the system:
    - GitHub Copilot: `gh copilot --version` or `copilot --version`
-   - Claude: `claude --version`
+   - OpenCode: `opencode --version` or check your installation method
    - Google Gemini: `gemini --version` or check your installation method
-   - Gemini: `gemini --version`
 2. Check if CLI tool is in PATH
 3. Verify CLI tool authentication is configured:
    - Copilot: `gh auth status`
-   - Claude: Check API key in environment or config
+   - OpenCode: Check API key configuration in environment or config
    - Gemini: Check Google AI API key configuration
-   - Gemini: Verify Gemini CLI authentication
 4. Try `/xterm` then manually start the tool to see error messages
 5. Check terminal output for authentication or configuration errors
 

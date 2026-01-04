@@ -49,11 +49,6 @@ CLEAN_UP_MEDIADIR=false
 # Set to 0 to disable auto-deletion of messages
 MESSAGE_DELETE_TIMEOUT=10000
 
-# Automatically notify users when URLs are detected in terminal output (true/false)
-# When enabled, URLs found in the terminal buffer will be sent as messages
-# and deleted after MESSAGE_DELETE_TIMEOUT interval (default: true)
-AUTO_NOTIFY_URLS=true
-
 # Auto-refresh Configuration
 # Automatically refresh the last shown terminal screenshot after sending commands
 # Refresh interval in milliseconds (default: 5000 = 5 seconds)
