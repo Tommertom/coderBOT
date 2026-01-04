@@ -14,21 +14,6 @@ services:
     tty: true
     stdin_open: true
 
-volumes:
-  coderbot-media:
-
-      # Media folders for each bot worker
-      - ./media:/tmp/coderBOT_media
-
-      # Optional: Persist terminal history
-      - terminal_history:/home/node
-
-      # Optional: Mount a working directory for file operations
-      - bot_workspace:/workspace
-
-      # Optional: Persist GitHub CLI authentication (for Copilot CLI)
-      - gh_config:/home/node/.config/gh
-
     # Resource limits (adjust based on your needs)
     deploy:
       resources:
@@ -55,6 +40,8 @@ volumes:
       start_period: 60s
 
 volumes:
+  coderbot-media:
+    driver: local
   terminal_history:
     driver: local
   bot_workspace:
