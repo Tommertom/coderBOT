@@ -211,47 +211,41 @@ TELEGRAM_BOT_TOKENS=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz,0987654321:XYZabcDEFgh
 
 ### Installation Methods
 
-**Method 1: Docker (Automated Script - Isolated Environment)**
+**Docker Installation**
 
-Use the automated Docker deployment script for a fully isolated, production-ready environment:
+1. **Configure the bot** by creating a `.env` file in the project root (see Configuration section above for all available options):
 
-```bash
-# Run the automated Docker setup script
-./scripts/run-coderbot-docker.sh <BOT_TOKEN> <USER_ID> <GITHUB_PAT>
+```env
+# Required: Your Telegram bot token(s)
+TELEGRAM_BOT_TOKENS=your_telegram_bot_token_here
 
-# Example:
-./scripts/run-coderbot-docker.sh \
-  "123456789:ABCdef..." \
-  "987654321" \
-  "ghp_xxxxx..."
+# Required: Comma-separated list of allowed user IDs
+ALLOWED_USER_IDS=your_telegram_user_id
+
+# Optional: Other configuration options (see Configuration section)
+XTERM_SESSION_TIMEOUT=1800000
+MEDIA_TMP_LOCATION=/tmp/coderBOT_media
 ```
 
-This script automatically:
-- Creates a minimal Docker container with all dependencies
-- Installs and configures GitHub CLI and Copilot CLI
-- Sets up the bot with your credentials
-- Provides easy management with docker-compose
-
-**See [Docker Runner Documentation](docs/docker-runner-script.md) for detailed instructions.**
-
-**Method 2: Docker (Manual - Using Existing Dockerfile)**
+2. **Run the bot** with Docker Compose:
 
 ```bash
-# Build the image
-docker build -t coderbot .
-
-# Run with your .env file
-docker run -d --name coderbot \
-  --env-file .env \
-  -v $(pwd)/logs:/app/logs \
-  coderbot
+docker compose up -d
 ```
 
-### Prerequisites: Authenticating AI Coding Tools
+3. **View logs** to verify the bot started correctly:
 
-**Important:** Before you can use the AI coding assistants (`/copilot`, `/opencode`, `/gemini`), you must first authenticate these tools on the server where the bot is running.
-Do this by manually running each tool in a terminal to complete their authentication flow.
-Include authentication for Git and GitHub CLI as well, since most AI tools depend on them.
+```bash
+docker compose logs -f
+```
+
+4. **Stop the bot** when needed:
+
+```bash
+docker compose down
+```
+
+**Note:** The Docker container includes Node.js and npm but does not include AI coding tools (GitHub Copilot CLI, OpenCode, Gemini, etc.). You'll need to install and authenticate these tools inside the container after it's running, or customize the Dockerfile to include them.
 
 ## Commands
 
