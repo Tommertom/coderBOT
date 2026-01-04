@@ -19,29 +19,32 @@ A Telegram bot that provides interactive terminal sessions with support for AI c
 
 See how CoderBot works with these interactive examples:
 
-<p align="center">
-  <img src="images/screenshot1.gif" alt="CoderBot Demo 1" width="600"/>
-  <br/>
-  <em>Starting a session and interacting with the terminal</em>
-</p>
-
-<p align="center">
-  <img src="images/screenshot2.gif" alt="CoderBot Demo 2" width="600"/>
-  <br/>
-  <em>Using AI coding assistants through Telegram</em>
-</p>
-
-<p align="center">
-  <img src="images/screenshot3.gif" alt="CoderBot Demo 3" width="600"/>
-  <br/>
-  <em>Terminal screenshot functionality</em>
-</p>
-
-<p align="center">
-  <img src="images/screenshot4.gif" alt="CoderBot Demo 4" width="600"/>
-  <br/>
-  <em>Managing sessions and commands</em>
-</p>
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="images/screenshot1.gif" alt="CoderBot Demo 1" width="400"/>
+      <br/>
+      <em>Starting a session and interacting with the terminal</em>
+    </td>
+    <td align="center">
+      <img src="images/screenshot2.gif" alt="CoderBot Demo 2" width="400"/>
+      <br/>
+      <em>Using AI coding assistants through Telegram</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="images/screenshot3.gif" alt="CoderBot Demo 3" width="400"/>
+      <br/>
+      <em>Terminal screenshot functionality</em>
+    </td>
+    <td align="center">
+      <img src="images/screenshot4.gif" alt="CoderBot Demo 4" width="400"/>
+      <br/>
+      <em>Managing sessions and commands</em>
+    </td>
+  </tr>
+</table>
 
 ## Quick Start
 
