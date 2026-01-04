@@ -25,9 +25,6 @@ export class ConfigService {
     // Message Configuration
     private readonly messageDeleteTimeout: number;
 
-    // URL Configuration
-    private readonly autoNotifyUrls: boolean;
-
     // Auto-refresh Configuration
     private readonly screenRefreshInterval: number;
     private readonly screenRefreshMaxCount: number;
@@ -87,10 +84,6 @@ export class ConfigService {
 
         // Load message configuration
         this.messageDeleteTimeout = parseInt(process.env.MESSAGE_DELETE_TIMEOUT || '10000', 10);
-
-        // Load URL configuration
-        const autoNotifyUrlsValue = process.env.AUTO_NOTIFY_URLS?.toLowerCase();
-        this.autoNotifyUrls = autoNotifyUrlsValue === 'true' || autoNotifyUrlsValue === '1';
 
         // Load auto-refresh configuration
         this.screenRefreshInterval = parseInt(process.env.SCREEN_REFRESH_INTERVAL || '5000', 10);
@@ -182,11 +175,6 @@ export class ConfigService {
     // Message Configuration Getters
     getMessageDeleteTimeout(): number {
         return this.messageDeleteTimeout;
-    }
-
-    // URL Configuration Getters
-    isAutoNotifyUrlsEnabled(): boolean {
-        return this.autoNotifyUrls;
     }
 
     // Auto-refresh Configuration Getters

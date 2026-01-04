@@ -40,7 +40,6 @@ export class CoderBot {
     private confirmNotificationDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
     private registeredCustomCoders: Set<string> = new Set();
     private mdFileCache: Map<string, string[]> = new Map(); // userId -> file paths
-    private projectDirCache: Map<string, string[]> = new Map(); // userId -> directory paths
 
     constructor(
         botId: string,
@@ -88,8 +87,6 @@ export class CoderBot {
         bot.command('help', AccessControlMiddleware.requireAccess, this.handleHelp.bind(this));
         bot.command('close', AccessControlMiddleware.requireAccess, this.handleClose.bind(this));
         bot.command('killbot', AccessControlMiddleware.requireAccess, this.handleKillbot.bind(this));
-        bot.command('urls', AccessControlMiddleware.requireAccess, this.handleUrls.bind(this));
-        bot.command('projects', AccessControlMiddleware.requireAccess, this.handleProjects.bind(this));
         bot.command('macros', AccessControlMiddleware.requireAccess, this.handleMacros.bind(this));
         bot.command('md', AccessControlMiddleware.requireAccess, this.handleMd.bind(this));
         bot.on('callback_query:data', AccessControlMiddleware.requireAccess, this.handleCallbackQuery.bind(this));
@@ -298,62 +295,6 @@ export class CoderBot {
                 return;
             }
 
-            // Handle project selection
-            if (callbackData.startsWith('project:')) {
-                const projectData = callbackData.substring(8);
-                if (projectData === 'cancel') {
-                    await this.safeAnswerCallbackQuery(ctx, '❌ Cancelled');
-                    if (ctx.callbackQuery?.message) {
-                        await ctx.deleteMessage();
-                    }
-                    // Clean up cache
-                    this.projectDirCache.delete(userId);
-                    return;
-                }
-                
-                if (!this.xtermService.hasSession(userId)) {
-                    await this.safeAnswerCallbackQuery(ctx, Messages.NO_ACTIVE_TERMINAL_SESSION);
-                    return;
-                }
-
-                try {
-                    // Get the directory path from cache using the index
-                    const projectIndex = parseInt(projectData, 10);
-                    const cachedDirs = this.projectDirCache.get(userId);
-                    
-                    if (!cachedDirs || projectIndex < 0 || projectIndex >= cachedDirs.length) {
-                        await this.safeAnswerCallbackQuery(ctx, `❌ Project not found in cache`);
-                        if (ctx.callbackQuery?.message) {
-                            await ctx.deleteMessage();
-                        }
-                        this.projectDirCache.delete(userId);
-                        return;
-                    }
-                    
-                    const projectDir = cachedDirs[projectIndex];
-
-                    this.xtermService.writeRawToSession(userId, `cd ${projectDir}`);
-                    setTimeout(() => {
-                        this.xtermService.writeRawToSession(userId, '\r');
-                    }, 100);
-                    await this.safeAnswerCallbackQuery(ctx, `✅ Changed to: ${path.basename(projectDir)}`);
-                    if (ctx.callbackQuery?.message) {
-                        await ctx.deleteMessage();
-                    }
-                    this.triggerAutoRefresh(userId, chatId);
-                    
-                    // Clean up cache after successful use
-                    this.projectDirCache.delete(userId);
-                } catch (error) {
-                    console.error('Failed to process project selection:', error);
-                    await this.safeAnswerCallbackQuery(ctx, `❌ Failed to change directory`);
-                    if (ctx.callbackQuery?.message) {
-                        await ctx.deleteMessage();
-                    }
-                    this.projectDirCache.delete(userId);
-                }
-                return;
-            }
 
             // Handle markdown file selection
             if (callbackData.startsWith('md:')) {
@@ -1185,8 +1126,6 @@ export class CoderBot {
             '*Viewing Output:*\n' +
             '/screen - Capture and view terminal screenshot\n' +
             '/airplane [on|off] - Toggle/check airplane mode (text vs images)\n' +
-            '/urls - Show all URLs found in terminal output\n' +
-            '/projects - List and select project directories\n' +
             '/md - Show 5 most recently updated markdown files\n' +
             'Click 🔄 Refresh button on screenshots to update\n\n' +
             '*Media Upload & Download:*\n' +
@@ -1211,69 +1150,6 @@ export class CoderBot {
         await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 4);
     }
 
-    private async handleUrls(ctx: Context): Promise<void> {
-        try {
-            const sentMsg = await ctx.reply('🔗 URL detection has been disabled.', { parse_mode: 'Markdown' });
-            await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-        } catch (error) {
-            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
-        }
-    }
-
-    private async handleProjects(ctx: Context): Promise<void> {
-        try {
-            const userId = ctx.from!.id.toString();
-            const homeDir = this.configService.getHomeDirectory();
-            
-            const entries = await fs.promises.readdir(homeDir, { withFileTypes: true });
-            const directories = entries
-                .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
-                .map(entry => path.join(homeDir, entry.name))
-                .sort();
-
-            if (directories.length === 0) {
-                const sentMsg = await ctx.reply(
-                    '📁 *No Projects Found*\n\n' +
-                    `No directories found in ${homeDir}`,
-                    { parse_mode: 'Markdown' }
-                );
-                await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
-                return;
-            }
-
-            const keyboard = new InlineKeyboard();
-            
-            // Store directories in cache for callback resolution
-            this.projectDirCache.set(userId, directories);
-            
-            directories.forEach((dir, index) => {
-                const dirName = path.basename(dir);
-                const escapedDirName = TextSanitizationUtils.escapeMarkdown(dirName);
-                keyboard.text(escapedDirName, `project:${index}`);
-                if ((index + 1) % 2 === 0) {
-                    keyboard.row();
-                }
-            });
-            
-            if (directories.length % 2 !== 0) {
-                keyboard.row();
-            }
-            
-            keyboard.text('❌ Cancel', 'project:cancel');
-
-            const sentMsg = await ctx.reply(
-                `📁 *Select a Project* (${directories.length})\n\nChoose a directory to navigate to:`,
-                {
-                    parse_mode: 'Markdown',
-                    reply_markup: keyboard
-                }
-            );
-
-            await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 3);
-        } catch (error) {
-            await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
-        }
-    }
 
     private async handleMacros(ctx: Context): Promise<void> {
         try {
