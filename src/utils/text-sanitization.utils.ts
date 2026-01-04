@@ -87,4 +87,15 @@ export class TextSanitizationUtils {
         const safeText = text.replace(/```/g, "'''");
         return '```\n' + safeText + '\n```';
     }
+
+    /**
+     * Escape special Markdown characters in text for use with parse_mode: 'Markdown'
+     * This is primarily for button text in inline keyboards
+     * @param text - Text to escape
+     * @returns Escaped text safe for Markdown parsing
+     */
+    static escapeMarkdown(text: string): string {
+        // Escape special Markdown characters: _ * [ ] ( ) ~ ` > # + - = | { } . !
+        return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
+    }
 }

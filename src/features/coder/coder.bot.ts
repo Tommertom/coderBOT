@@ -19,7 +19,7 @@ import * as https from 'https';
 
 export enum AssistantType {
     COPILOT = 'copilot',
-    CLAUDE = 'claude',
+    OPENCODE = 'opencode',
     GEMINI = 'gemini'
 }
 
@@ -39,6 +39,8 @@ export class CoderBot {
     private activeAssistantType: AssistantType | string | null = null;
     private confirmNotificationDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
     private registeredCustomCoders: Set<string> = new Set();
+    private mdFileCache: Map<string, string[]> = new Map(); // userId -> file paths
+    private projectDirCache: Map<string, string[]> = new Map(); // userId -> directory paths
 
     constructor(
         botId: string,
@@ -77,7 +79,7 @@ export class CoderBot {
     registerHandlers(bot: Bot): void {
         this.bot = bot;
         bot.command('copilot', AccessControlMiddleware.requireAccess, this.handleCopilot.bind(this));
-        bot.command('claude', AccessControlMiddleware.requireAccess, this.handleClaude.bind(this));
+        bot.command('opencode', AccessControlMiddleware.requireAccess, this.handleOpencode.bind(this));
         bot.command('gemini', AccessControlMiddleware.requireAccess, this.handleGemini.bind(this));
         bot.command('addcoder', AccessControlMiddleware.requireAccess, this.handleAddCoder.bind(this));
         bot.command('removecoder', AccessControlMiddleware.requireAccess, this.handleRemoveCoder.bind(this));
@@ -333,12 +335,14 @@ export class CoderBot {
 
             // Handle project selection
             if (callbackData.startsWith('project:')) {
-                const projectDir = callbackData.substring(8);
-                if (projectDir === 'cancel') {
+                const projectData = callbackData.substring(8);
+                if (projectData === 'cancel') {
                     await this.safeAnswerCallbackQuery(ctx, '❌ Cancelled');
                     if (ctx.callbackQuery?.message) {
                         await ctx.deleteMessage();
                     }
+                    // Clean up cache
+                    this.projectDirCache.delete(userId);
                     return;
                 }
                 
@@ -347,30 +351,73 @@ export class CoderBot {
                     return;
                 }
 
-                this.xtermService.writeRawToSession(userId, `cd ${projectDir}`);
-                setTimeout(() => {
-                    this.xtermService.writeRawToSession(userId, '\r');
-                }, 100);
-                await this.safeAnswerCallbackQuery(ctx, `✅ Changed to: ${path.basename(projectDir)}`);
-                if (ctx.callbackQuery?.message) {
-                    await ctx.deleteMessage();
+                try {
+                    // Get the directory path from cache using the index
+                    const projectIndex = parseInt(projectData, 10);
+                    const cachedDirs = this.projectDirCache.get(userId);
+                    
+                    if (!cachedDirs || projectIndex < 0 || projectIndex >= cachedDirs.length) {
+                        await this.safeAnswerCallbackQuery(ctx, `❌ Project not found in cache`);
+                        if (ctx.callbackQuery?.message) {
+                            await ctx.deleteMessage();
+                        }
+                        this.projectDirCache.delete(userId);
+                        return;
+                    }
+                    
+                    const projectDir = cachedDirs[projectIndex];
+
+                    this.xtermService.writeRawToSession(userId, `cd ${projectDir}`);
+                    setTimeout(() => {
+                        this.xtermService.writeRawToSession(userId, '\r');
+                    }, 100);
+                    await this.safeAnswerCallbackQuery(ctx, `✅ Changed to: ${path.basename(projectDir)}`);
+                    if (ctx.callbackQuery?.message) {
+                        await ctx.deleteMessage();
+                    }
+                    this.triggerAutoRefresh(userId, chatId);
+                    
+                    // Clean up cache after successful use
+                    this.projectDirCache.delete(userId);
+                } catch (error) {
+                    console.error('Failed to process project selection:', error);
+                    await this.safeAnswerCallbackQuery(ctx, `❌ Failed to change directory`);
+                    if (ctx.callbackQuery?.message) {
+                        await ctx.deleteMessage();
+                    }
+                    this.projectDirCache.delete(userId);
                 }
-                this.triggerAutoRefresh(userId, chatId);
                 return;
             }
 
             // Handle markdown file selection
             if (callbackData.startsWith('md:')) {
-                const filePath = callbackData.substring(3);
-                if (filePath === 'cancel') {
+                const fileData = callbackData.substring(3);
+                if (fileData === 'cancel') {
                     await this.safeAnswerCallbackQuery(ctx, '❌ Cancelled');
                     if (ctx.callbackQuery?.message) {
                         await ctx.deleteMessage();
                     }
+                    // Clean up cache
+                    this.mdFileCache.delete(userId);
                     return;
                 }
                 
                 try {
+                    // Get the file path from cache using the index
+                    const fileIndex = parseInt(fileData, 10);
+                    const cachedFiles = this.mdFileCache.get(userId);
+                    
+                    if (!cachedFiles || fileIndex < 0 || fileIndex >= cachedFiles.length) {
+                        await this.safeAnswerCallbackQuery(ctx, `❌ File not found in cache`);
+                        if (ctx.callbackQuery?.message) {
+                            await ctx.deleteMessage();
+                        }
+                        this.mdFileCache.delete(userId);
+                        return;
+                    }
+                    
+                    const filePath = cachedFiles[fileIndex];
                     const fileName = path.basename(filePath);
                     
                     // Delete the menu message
@@ -384,12 +431,16 @@ export class CoderBot {
                     });
                     
                     await this.safeAnswerCallbackQuery(ctx, `✅ Sent: ${fileName}`);
+                    
+                    // Clean up cache after successful send
+                    this.mdFileCache.delete(userId);
                 } catch (error) {
                     console.error('Failed to send markdown file:', error);
                     await this.safeAnswerCallbackQuery(ctx, `❌ Failed to send file`);
                     if (ctx.callbackQuery?.message) {
                         await ctx.deleteMessage();
                     }
+                    this.mdFileCache.delete(userId);
                 }
                 return;
             }
@@ -745,7 +796,7 @@ export class CoderBot {
     }
 
     /**
-     * Generic handler for AI assistant commands (copilot, claude, gemini, custom)
+     * Generic handler for AI assistant commands (copilot, opencode, gemini, custom)
      */
     private async handleAIAssistant(
         ctx: Context,
@@ -826,8 +877,8 @@ export class CoderBot {
         await this.handleAIAssistant(ctx, AssistantType.COPILOT);
     }
 
-    private async handleClaude(ctx: Context): Promise<void> {
-        await this.handleAIAssistant(ctx, AssistantType.CLAUDE);
+    private async handleOpencode(ctx: Context): Promise<void> {
+        await this.handleAIAssistant(ctx, AssistantType.OPENCODE);
     }
 
     private async handleGemini(ctx: Context): Promise<void> {
@@ -839,7 +890,7 @@ export class CoderBot {
      */
     private isReservedCommand(name: string): boolean {
         const reserved = [
-            'copilot', 'claude', 'gemini',
+            'copilot', 'opencode', 'gemini',
             'start', 'help', 'esc', 'close', 'killbot', 'urls', 'startup',
             'addcoder', 'removecoder'
         ];
@@ -956,7 +1007,7 @@ export class CoderBot {
             return;
         }
 
-        // Create a handler that works like copilot/claude/gemini
+        // Create a handler that works like copilot/opencode/gemini
         const handler = async (ctx: Context) => {
             const currentUserId = ctx.from!.id.toString();
             
@@ -1027,7 +1078,7 @@ export class CoderBot {
             if (!this.xtermService.hasSession(userId)) {
                 await ctx.reply(
                     '❌ No active session.\n\n' +
-                    'Please start a coder first with /copilot, /claude, /gemini, or your custom coder.',
+                    'Please start a coder first with /copilot, /opencode, /gemini, or your custom coder.',
                     { parse_mode: 'Markdown' }
                 );
                 return;
@@ -1110,7 +1161,7 @@ export class CoderBot {
             await ctx.reply(
                 '✅ *Coder Session Closed*\n\n' +
                 'The coder session has been terminated.\n\n' +
-                'Use /copilot, /claude, or /gemini to start a new session.',
+                'Use /copilot, /opencode, or /gemini to start a new session.',
                 { parse_mode: 'Markdown' }
             );
         } catch (error) {
@@ -1124,7 +1175,7 @@ export class CoderBot {
             'Your AI-powered terminal assistant is ready to help.\n\n' +
             '*Quick Start:*\n' +
             '/copilot - Start GitHub Copilot CLI\n' +
-            '/claude - Start Claude AI\n' +
+            '/opencode - Start OpenCode AI\n' +
             '/gemini - Start Gemini AI\n' +
             '/xterm - Start raw terminal\n' +
             '/help - Show all available commands\n\n' +
@@ -1141,7 +1192,7 @@ export class CoderBot {
             '🤖 *CoderBOT - Complete Command Reference*\n\n' +
             '*Starting Sessions:*\n' +
             '/copilot - Start GitHub Copilot CLI session\n' +
-            '/claude - Start Claude AI session\n' +
+            '/opencode - Start OpenCode AI session\n' +
             '/gemini - Start Gemini AI session\n' +
             '/xterm - Start raw terminal (no AI)\n\n' +
             '*Custom Coders:*\n' +
@@ -1232,6 +1283,7 @@ export class CoderBot {
 
     private async handleProjects(ctx: Context): Promise<void> {
         try {
+            const userId = ctx.from!.id.toString();
             const homeDir = this.configService.getHomeDirectory();
             
             const entries = await fs.promises.readdir(homeDir, { withFileTypes: true });
@@ -1252,9 +1304,13 @@ export class CoderBot {
 
             const keyboard = new InlineKeyboard();
             
+            // Store directories in cache for callback resolution
+            this.projectDirCache.set(userId, directories);
+            
             directories.forEach((dir, index) => {
                 const dirName = path.basename(dir);
-                keyboard.text(dirName, `project:${dir}`);
+                const escapedDirName = TextSanitizationUtils.escapeMarkdown(dirName);
+                keyboard.text(escapedDirName, `project:${index}`);
                 if ((index + 1) % 2 === 0) {
                     keyboard.row();
                 }
@@ -1356,14 +1412,27 @@ export class CoderBot {
                 .sort((a, b) => b.mtime.getTime() - a.mtime.getTime())
                 .slice(0, 5);
             
+            // Store file paths in cache with user ID
+            const filePaths = recentFiles.map(f => f.path);
+            this.mdFileCache.set(userId, filePaths);
+            
+            // Send debug log with working directory (permanent message)
+            await ctx.reply(
+                `🔍 *Debug Info*\n\nWorking directory: \`${cwd}\``,
+                { parse_mode: 'Markdown' }
+            );
+            
             const keyboard = new InlineKeyboard();
             
             recentFiles.forEach((file, index) => {
                 const relativePath = path.relative(cwd, file.path);
-                const displayName = relativePath.length > 40 
-                    ? '...' + relativePath.slice(-37) 
-                    : relativePath;
-                keyboard.text(displayName, `md:${file.path}`);
+                // Replace backslashes with forward slashes for display
+                const normalizedPath = relativePath.replace(/\\/g, '/');
+                const displayName = normalizedPath.length > 40 
+                    ? '...' + normalizedPath.slice(-37) 
+                    : normalizedPath;
+                const escapedDisplayName = TextSanitizationUtils.escapeMarkdown(displayName);
+                keyboard.text(escapedDisplayName, `md:${index}`);
                 keyboard.row();
             });
             
