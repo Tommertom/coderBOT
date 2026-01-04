@@ -103,10 +103,10 @@ export class AudioService {
     ): Promise<TranscriptionResponse> {
         try {
             const audioBuffer = await readFile(audioFilePath);
-            
+
             // Create OpenAI instance with API key
             const openaiProvider = createOpenAI({ apiKey });
-            
+
             const { text } = await transcribe({
                 model: openaiProvider.transcription('whisper-1'),
                 audio: audioBuffer,
@@ -118,7 +118,7 @@ export class AudioService {
             };
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            
+
             // Check for specific error patterns
             if (message.includes('401') || message.includes('invalid_api_key') || message.includes('Incorrect API key')) {
                 throw new AudioTranscriptionError(

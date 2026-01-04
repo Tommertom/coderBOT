@@ -233,12 +233,12 @@ export class ConfigService {
         if (!this.ttsApiKey) {
             return null;
         }
-        
+
         // OpenAI keys start with "sk-"
         if (this.ttsApiKey.startsWith('sk-')) {
             return 'openai';
         }
-        
+
         // Gemini keys typically start with "AIza" or are alphanumeric
         // If it doesn't match OpenAI pattern, assume Gemini
         return 'gemini';

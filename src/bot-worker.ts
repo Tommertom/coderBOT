@@ -125,10 +125,10 @@ async function startWorker() {
             const me = await bot.api.getMe();
             const fullName = [me.first_name, me.last_name].filter(Boolean).join(" ");
             console.log(`[Worker ${botId}] Bot info: ${fullName} (@${me.username})`);
-            
+
             if (process.send) {
-                process.send({ 
-                    type: IPCMessageType.BOT_INFO, 
+                process.send({
+                    type: IPCMessageType.BOT_INFO,
                     botId,
                     data: {
                         fullName,

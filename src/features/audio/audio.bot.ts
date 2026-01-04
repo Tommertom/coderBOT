@@ -30,7 +30,7 @@ export class AudioBot {
         this.botId = botId;
         this.audioService = audioService;
         this.configService = configService;
-        
+
         // Create bot-specific audio temp directory
         const baseMediaPath = configService.getMediaTmpLocation();
         this.audioTmpPath = path.join(baseMediaPath, botId, 'audio');
@@ -138,7 +138,7 @@ export class AudioBot {
         try {
             // Get file from Telegram
             const file = await ctx.api.getFile(fileId);
-            
+
             if (!file.file_path) {
                 throw new AudioTranscriptionError(
                     AudioErrorType.DOWNLOAD_FAILED,
@@ -164,7 +164,7 @@ export class AudioBot {
             // Download file from Telegram
             const botToken = this.bot!.token;
             const fileUrl = `https://api.telegram.org/file/bot${botToken}/${file.file_path}`;
-            
+
             await this.downloadFile(fileUrl, sanitizedPath);
 
             return sanitizedPath;
@@ -183,7 +183,7 @@ export class AudioBot {
     private downloadFile(url: string, destination: string): Promise<void> {
         return new Promise((resolve, reject) => {
             const file = fs.createWriteStream(destination);
-            
+
             https.get(url, (response) => {
                 if (response.statusCode !== 200) {
                     file.close();
@@ -215,7 +215,7 @@ export class AudioBot {
     private getFileExtension(filePath: string, type: 'voice' | 'audio'): string {
         const ext = path.extname(filePath);
         if (ext) return ext;
-        
+
         // Default extensions for voice messages
         return type === 'voice' ? '.ogg' : '.mp3';
     }
@@ -237,9 +237,9 @@ export class AudioBot {
         provider: AudioProvider
     ): Promise<void> {
         const providerName = provider === AudioProvider.OPENAI ? 'OpenAI Whisper' : 'Google Gemini';
-        
+
         const message = `🎙️ *Transcription* (via ${providerName}):\n\n\`\`\`\n${text}\n\`\`\`\n\n_You can now copy and use this text for your command._`;
-        
+
         await ctx.reply(message, { parse_mode: 'Markdown' });
     }
 
