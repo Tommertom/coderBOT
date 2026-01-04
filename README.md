@@ -38,7 +38,9 @@ coderbot
 ✅ Fully supported - works out of the box
 
 ### Windows
-❌ **Not Supported** - CoderBOT uses `node-pty` which requires native compilation.
+❌ **Native installation not supported** - CoderBOT uses `node-pty` which requires native compilation and is not compatible with Windows.
+
+✅ **Use Docker instead** - Windows users can run CoderBOT using Docker Desktop. See the Docker Installation section below for instructions.
 
 ## Features
 
