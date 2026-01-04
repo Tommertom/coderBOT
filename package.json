@@ -1,6 +1,6 @@
 {
   "name": "@tommertom/coderbot",
-  "version": "0.8.7",
+  "version": "0.8.8",
   "description": "AI-powered Telegram bot providing interactive terminal sessions with support for GitHub Copilot, Claude, Cursor, and other CLI-based AI coding assistants",
   "main": "dist/app.js",
   "bin": {
