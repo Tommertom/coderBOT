@@ -1,13 +1,11 @@
 import { type CoderConfig } from './coder.types.js';
 import { ConfigService } from '../../services/config.service.js';
-import { UrlExtractionUtils } from '../../utils/url-extraction.utils.js';
 import * as path from 'path';
 import * as fs from 'fs';
 
 export interface TerminalDataHandlers {
     onBell?: (userId: string, chatId: number) => void;
     onConfirmationPrompt?: (userId: string, chatId: number, data: string) => void;
-    onUrlDiscovered?: (userId: string, chatId: number, url: string) => void;
 }
 
 export class CoderService {
@@ -15,11 +13,6 @@ export class CoderService {
     private dataBuffers: Map<string, string> = new Map();
     private botId: string;
     private getFullBufferCallback?: (userId: string) => string[];
-
-    // URL tracking
-    private discoveredUrls: Map<string, Set<string>> = new Map();
-    private notifiedUrls: Map<string, Set<string>> = new Map();
-    private urlNotificationTimeouts: Map<string, Map<number, NodeJS.Timeout>> = new Map();
 
     constructor(configService: ConfigService, botId: string) {
         this.botId = botId;
@@ -66,45 +59,6 @@ export class CoderService {
         return userId;
     }
 
-    getDiscoveredUrls(userId: string): string[] {
-        const userKey = this.getUserKey(userId);
-        const urls = this.discoveredUrls.get(userKey);
-        return urls ? Array.from(urls) : [];
-    }
-
-    clearUrlsForUser(userId: string): void {
-        const userKey = this.getUserKey(userId);
-        this.discoveredUrls.delete(userKey);
-        this.notifiedUrls.delete(userKey);
-
-        // Clear all timeouts for this user
-        const timeouts = this.urlNotificationTimeouts.get(userKey);
-        if (timeouts) {
-            timeouts.forEach(timeout => clearTimeout(timeout));
-            this.urlNotificationTimeouts.delete(userKey);
-        }
-    }
-
-    registerUrlNotificationTimeout(userId: string, messageId: number, timeout: NodeJS.Timeout): void {
-        const userKey = this.getUserKey(userId);
-        if (!this.urlNotificationTimeouts.has(userKey)) {
-            this.urlNotificationTimeouts.set(userKey, new Map());
-        }
-        this.urlNotificationTimeouts.get(userKey)!.set(messageId, timeout);
-    }
-
-    clearUrlNotificationTimeout(userId: string, messageId: number): void {
-        const userKey = this.getUserKey(userId);
-        const timeouts = this.urlNotificationTimeouts.get(userKey);
-        if (timeouts) {
-            const timeout = timeouts.get(messageId);
-            if (timeout) {
-                clearTimeout(timeout);
-                timeouts.delete(messageId);
-            }
-        }
-    }
-
     getMediaPath(): string {
         return this.config.mediaPath;
     }
@@ -136,31 +90,6 @@ export class CoderService {
                 handlers.onConfirmationPrompt(userId, chatId, '💬 Select option');
             }
 
-            // URL detection
-            if (handlers.onUrlDiscovered) {
-                const urls = UrlExtractionUtils.extractUrlsFromTerminalOutput(data);
-                const userKey = this.getUserKey(userId);
-
-                if (!this.discoveredUrls.has(userKey)) {
-                    this.discoveredUrls.set(userKey, new Set());
-                }
-                if (!this.notifiedUrls.has(userKey)) {
-                    this.notifiedUrls.set(userKey, new Set());
-                }
-
-                const discovered = this.discoveredUrls.get(userKey)!;
-                const notified = this.notifiedUrls.get(userKey)!;
-
-                urls.forEach(url => {
-                    discovered.add(url);
-
-                    // Notify only if not already notified
-                    if (!notified.has(url)) {
-                        notified.add(url);
-                        handlers.onUrlDiscovered!(userId, chatId, url);
-                    }
-                });
-            }
         };
     }
 }

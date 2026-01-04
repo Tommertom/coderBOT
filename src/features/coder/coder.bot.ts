@@ -120,41 +120,6 @@ export class CoderBot {
         }
     }
 
-    /**
-     * Callback for handling newly discovered URLs in terminal output
-     */
-    private async handleUrlDiscovered(userId: string, chatId: number, url: string): Promise<void> {
-        if (!this.bot || !this.configService.isAutoNotifyUrlsEnabled()) {
-            return;
-        }
-
-        try {
-            // Send URL notification message
-            const sentMsg = await this.bot.api.sendMessage(
-                chatId,
-                `\`${url}\``,
-                { parse_mode: 'Markdown' }
-            );
-
-            // Schedule message deletion if timeout is configured
-            const deleteTimeout = this.configService.getMessageDeleteTimeout();
-            if (deleteTimeout > 0) {
-                const timeout = setTimeout(async () => {
-                    try {
-                        await this.bot?.api.deleteMessage(chatId, sentMsg.message_id);
-                        this.coderService.clearUrlNotificationTimeout(userId, sentMsg.message_id);
-                    } catch (error) {
-                        console.error('Failed to delete URL notification message:', error);
-                    }
-                }, deleteTimeout);
-
-                this.coderService.registerUrlNotificationTimeout(userId, sentMsg.message_id, timeout);
-            }
-        } catch (error) {
-            console.error('Failed to send URL notification:', error);
-        }
-    }
-
     private async handleBellNotification(userId: string, chatId: number): Promise<void> {
         if (!this.bot) {
             console.error('Bot instance not available for BEL notification');
@@ -819,7 +784,6 @@ export class CoderBot {
             const dataHandler = this.coderService.createTerminalDataHandler({
                 onBell: this.handleBellNotification.bind(this),
                 onConfirmationPrompt: this.handleConfirmNotification.bind(this),
-                onUrlDiscovered: this.handleUrlDiscovered.bind(this),
             });
 
             // Set buffer getter so CoderService can access full buffer
@@ -1148,7 +1112,6 @@ export class CoderBot {
 
             this.xtermService.closeSession(userId);
             this.coderService.clearBuffer(userId, chatId);
-            this.coderService.clearUrlsForUser(userId);
 
             // Clear the active assistant type
             this.activeAssistantType = null;
@@ -1249,32 +1212,8 @@ export class CoderBot {
     }
 
     private async handleUrls(ctx: Context): Promise<void> {
-        const userId = ctx.from!.id.toString();
-
         try {
-            if (!this.xtermService.hasSession(userId)) {
-                await ctx.reply(Messages.NO_ACTIVE_SESSION);
-                return;
-            }
-
-            // Get URLs from CoderService instead of XtermService
-            const urls = this.coderService.getDiscoveredUrls(userId);
-
-            if (urls.length === 0) {
-                await ctx.reply(
-                    '🔗 *No URLs Found*\n\n' +
-                    'No URLs have been detected in the terminal output yet.',
-                    { parse_mode: 'Markdown' }
-                );
-                return;
-            }
-
-            const urlList = urls.map(url => `\`${url}\``).join('\n');
-            const sentMsg = await ctx.reply(
-                `🔗 *Discovered URLs* (${urls.length})\n\n${urlList}`,
-                { parse_mode: 'Markdown' }
-            );
-
+            const sentMsg = await ctx.reply('🔗 URL detection has been disabled.', { parse_mode: 'Markdown' });
             await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
         } catch (error) {
             await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));
