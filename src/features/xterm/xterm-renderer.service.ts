@@ -16,22 +16,41 @@ export class XtermRendererService {
             return;
         }
 
-        try {
-            this.browser = await puppeteer.launch({
-                headless: true,
-                executablePath: '/usr/bin/chromium-browser',
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu',
-                ],
-            });
+        const maxRetries = 3;
+        let lastError: Error | null = null;
 
-            this.page = await this.browser.newPage();
-            await this.page.setViewport({ width: 1200, height: 800 });
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`[XtermRenderer] Initializing browser (attempt ${attempt}/${maxRetries})...`);
 
-            const htmlContent = `
+                this.browser = await puppeteer.launch({
+                    headless: true,
+                    executablePath: '/usr/bin/chromium-browser',
+                    timeout: 60000,
+                    protocolTimeout: 180000,
+                    args: [
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-gpu',
+                        '--no-zygote',
+                        '--single-process',
+                        '--disable-web-security',
+                        '--disable-features=IsolateOrigins,site-per-process',
+                        '--disable-background-networking',
+                        '--disable-default-apps',
+                        '--disable-extensions',
+                        '--disable-sync',
+                        '--no-first-run',
+                        '--disable-translate',
+                    ],
+                });
+
+                console.log('[XtermRenderer] Browser launched, creating new page...');
+                this.page = await this.browser.newPage();
+                await this.page.setViewport({ width: 1200, height: 800 });
+
+                const htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -58,90 +77,128 @@ export class XtermRendererService {
 </html>
             `;
 
-            await this.page.setContent(htmlContent);
-            await this.page.waitForFunction(() => typeof (window as any).Terminal !== 'undefined');
+                await this.page.setContent(htmlContent, { waitUntil: 'networkidle0', timeout: 30000 });
+                await this.page.waitForFunction(() => typeof (window as any).Terminal !== 'undefined', { timeout: 30000 });
 
-            this.isInitialized = true;
-        } catch (error) {
-            this.isInitialized = false;
-            throw new Error(`Failed to initialize renderer: ${error}`);
+                this.isInitialized = true;
+                console.log('[XtermRenderer] Browser initialized successfully');
+                return;
+            } catch (error) {
+                lastError = error as Error;
+                console.error(`[XtermRenderer] Initialization attempt ${attempt} failed:`, error);
+
+                await this.cleanup();
+
+                if (attempt < maxRetries) {
+                    const waitTime = attempt * 2000;
+                    console.log(`[XtermRenderer] Retrying in ${waitTime}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                }
+            }
         }
+
+        this.isInitialized = false;
+        throw new Error(`Failed to initialize renderer after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
     }
 
     async renderToImage(output: string[], rows: number, cols: number): Promise<Buffer> {
-        if (!this.isInitialized || !this.page) {
-            await this.initialize();
-        }
+        const maxRetries = 2;
+        let lastError: Error | null = null;
 
-        if (!this.page) {
-            throw new Error('Page not initialized');
-        }
-
-        try {
-            const terminalContent = output.join('');
-            const fontSize = this.configService.getXtermFontSize();
-
-            await this.page.evaluate((content: string, r: number, c: number, fontSize: number) => {
-                const terminalDiv = document.getElementById('terminal');
-                if (terminalDiv) {
-                    terminalDiv.innerHTML = '';
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                if (!this.isInitialized || !this.page) {
+                    console.log('[XtermRenderer] Page not initialized, initializing...');
+                    await this.initialize();
                 }
 
-                const term = new (window as any).Terminal({
-                    rows: r,
-                    cols: c,
-                    cursorBlink: false,
-                    fontFamily: 'Courier New, monospace',
-                    fontSize: fontSize,
-                    theme: {
-                        background: '#000000',
-                        foreground: '#ffffff',
-                        cursor: '#ffffff',
-                    },
+                if (!this.page) {
+                    throw new Error('Page not initialized after initialization attempt');
+                }
+
+                const terminalContent = output.join('');
+                const fontSize = this.configService.getXtermFontSize();
+
+                await this.page.evaluate((content: string, r: number, c: number, fontSize: number) => {
+                    const terminalDiv = document.getElementById('terminal');
+                    if (terminalDiv) {
+                        terminalDiv.innerHTML = '';
+                    }
+
+                    const term = new (window as any).Terminal({
+                        rows: r,
+                        cols: c,
+                        cursorBlink: false,
+                        fontFamily: 'Courier New, monospace',
+                        fontSize: fontSize,
+                        theme: {
+                            background: '#000000',
+                            foreground: '#ffffff',
+                            cursor: '#ffffff',
+                        },
+                    });
+
+                    term.open(document.getElementById('terminal'));
+                    term.write(content);
+
+                    (window as any).currentTerminal = term;
+                }, terminalContent, rows, cols, fontSize);
+
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                const element = await this.page.$('#terminal');
+                if (!element) {
+                    throw new Error('Terminal element not found');
+                }
+
+                const screenshot = await element.screenshot({
+                    type: 'png',
                 });
 
-                term.open(document.getElementById('terminal'));
-                term.write(content);
+                return screenshot as Buffer;
+            } catch (error) {
+                lastError = error as Error;
+                console.error(`[XtermRenderer] Render attempt ${attempt} failed:`, error);
 
-                (window as any).currentTerminal = term;
-            }, terminalContent, rows, cols, fontSize);
-
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            const element = await this.page.$('#terminal');
-            if (!element) {
-                throw new Error('Terminal element not found');
+                if (attempt < maxRetries) {
+                    console.log('[XtermRenderer] Cleaning up and retrying...');
+                    await this.cleanup();
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } else {
+                    throw new Error(`Failed to render terminal after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
+                }
             }
-
-            const screenshot = await element.screenshot({
-                type: 'png',
-            });
-
-            return screenshot as Buffer;
-        } catch (error) {
-            throw new Error(`Failed to render terminal: ${error}`);
         }
+
+        throw new Error(`Failed to render terminal: ${lastError?.message || 'Unknown error'}`);
     }
 
     async cleanup(): Promise<void> {
+        console.log('[XtermRenderer] Cleaning up browser resources...');
+
         if (this.page) {
             try {
-                await this.page.close();
+                if (!this.page.isClosed()) {
+                    await this.page.close();
+                }
             } catch (error) {
-                console.error('Error closing page:', error);
+                console.error('[XtermRenderer] Error closing page:', error);
             }
             this.page = null;
         }
 
         if (this.browser) {
             try {
-                await this.browser.close();
+                if (this.browser.connected) {
+                    await this.browser.close();
+                }
             } catch (error) {
-                console.error('Error closing browser:', error);
+                console.error('[XtermRenderer] Error closing browser:', error);
             }
             this.browser = null;
         }
 
         this.isInitialized = false;
+        console.log('[XtermRenderer] Cleanup complete');
     }
 }
