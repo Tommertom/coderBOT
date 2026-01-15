@@ -165,7 +165,7 @@ export class AudioService {
 
             // Make direct API request to Gemini
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-tts:generateContent?key=${apiKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -236,6 +236,7 @@ export class AudioService {
         const ext = path.extname(filePath).toLowerCase();
         const mimeTypes: { [key: string]: string } = {
             '.ogg': 'audio/ogg',
+            '.oga': 'audio/ogg',  // OGG Audio - Telegram voice messages
             '.opus': 'audio/opus',
             '.mp3': 'audio/mpeg',
             '.wav': 'audio/wav',

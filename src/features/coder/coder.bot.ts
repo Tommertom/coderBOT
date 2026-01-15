@@ -92,8 +92,17 @@ export class CoderBot {
         bot.on('callback_query:data', AccessControlMiddleware.requireAccess, this.handleCallbackQuery.bind(this));
         bot.on('message:photo', AccessControlMiddleware.requireAccess, this.handlePhoto.bind(this));
         bot.on('message:video', AccessControlMiddleware.requireAccess, this.handleVideo.bind(this));
-        bot.on('message:audio', AccessControlMiddleware.requireAccess, this.handleAudio.bind(this));
-        bot.on('message:voice', AccessControlMiddleware.requireAccess, this.handleVoice.bind(this));
+        
+        // Only register audio/voice handlers if audio transcription is NOT enabled
+        // If audio transcription is enabled, the AudioBot will handle these messages instead
+        if (!this.configService.hasTtsApiKey()) {
+            bot.on('message:audio', AccessControlMiddleware.requireAccess, this.handleAudio.bind(this));
+            bot.on('message:voice', AccessControlMiddleware.requireAccess, this.handleVoice.bind(this));
+            console.log(`[${this.botId}] Audio/voice handlers registered (file save mode - no transcription)`);
+        } else {
+            console.log(`[${this.botId}] Audio/voice handlers skipped (AudioBot will handle transcription)`);
+        }
+        
         bot.on('message:text', AccessControlMiddleware.requireAccess, this.handleTextMessage.bind(this));
         
         // Load and register custom coders on startup

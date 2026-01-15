@@ -59,6 +59,7 @@ export class AudioTranscriptionError extends Error {
 // Supported audio formats
 export const SUPPORTED_AUDIO_FORMATS = [
     'ogg',
+    'oga',  // OGG Audio - Telegram voice messages
     'mp3',
     'wav',
     'webm',

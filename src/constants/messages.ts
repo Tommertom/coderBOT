@@ -75,7 +75,7 @@ export const AudioErrors = {
         'Please try again or check your API key and quota.',
 
     UNSUPPORTED_FORMAT: '⚠️ Unsupported audio format.\n\n' +
-        'Supported formats: .ogg, .mp3, .wav, .webm, .m4a, .flac, .opus',
+        'Supported formats: .ogg, .oga, .mp3, .wav, .webm, .m4a, .flac, .opus',
 
     FILE_TOO_LARGE: '⚠️ Audio file is too large.\n\n' +
         'Maximum size: 25MB',
