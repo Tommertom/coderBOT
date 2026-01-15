@@ -69,7 +69,7 @@
   "dependencies": {
     "@ai-sdk/google": "^2.0.11",
     "@ai-sdk/openai": "^2.0.23",
-    "@google/genai": "^1.24.0",
+    "@google/genai": "^1.36.0",
     "ai": "^5.0.30",
     "archiver": "^7.0.1",
     "dotenv": "^17.2.2",

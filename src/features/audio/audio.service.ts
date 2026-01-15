@@ -7,7 +7,7 @@
 
 import { experimental_transcribe as transcribe } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { GoogleGenAI, createUserContent, createPartFromUri } from '@google/genai';
 import { ConfigService } from '../../services/config.service.js';
 import {
     AudioProvider,
@@ -159,40 +159,22 @@ export class AudioService {
         apiKey: string
     ): Promise<TranscriptionResponse> {
         try {
-            const audioBuffer = await readFile(audioFilePath);
-            const base64Audio = audioBuffer.toString('base64');
             const mimeType = this.getMimeType(audioFilePath);
+            const ai = new GoogleGenAI({ apiKey });
+            const uploadedFile = await ai.files.upload({
+                file: audioFilePath,
+                config: { mimeType }
+            });
 
-            // Make direct API request to Gemini
-            const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-tts:generateContent?key=${apiKey}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                {
-                                    text: "Transcribe this audio file. Return only the transcribed text without any additional commentary or formatting."
-                                },
-                                {
-                                    inlineData: {
-                                        mimeType: mimeType,
-                                        data: base64Audio
-                                    }
-                                }
-                            ]
-                        }]
-                    })
-                }
-            );
+            const response = await ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: createUserContent([
+                    createPartFromUri(uploadedFile.uri, uploadedFile.mimeType),
+                    'Transcribe this audio file. Return only the transcribed text without any additional commentary or formatting.'
+                ])
+            });
 
-            if (!response.ok) {
-                throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const text = response.text || '';
 
             if (!text) {
                 throw new Error('No transcription returned from Gemini');
