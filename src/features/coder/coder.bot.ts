@@ -753,7 +753,20 @@ export class CoderBot {
 
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            this.xtermService.writeToSession(userId, assistantType);
+            let command: string;
+            if (assistantType === AssistantType.COPILOT) {
+                const args = this.configService.getCopilotArguments().trim();
+                command = args ? `copilot ${args}` : 'copilot';
+            } else if (assistantType === AssistantType.GEMINI) {
+                const args = this.configService.getGeminiArguments().trim();
+                command = args ? `gemini ${args}` : 'gemini';
+            } else if (assistantType === AssistantType.OPENCODE) {
+                const args = this.configService.getOpencodeArguments().trim();
+                command = args ? `opencode ${args}` : 'opencode';
+            } else {
+                command = assistantType;
+            }
+            this.xtermService.writeToSession(userId, command);
 
             // Set the active assistant type for this session
             this.activeAssistantType = assistantType;

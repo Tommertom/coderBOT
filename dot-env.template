@@ -126,6 +126,19 @@ TTS_API_KEY=
 # Users can override this with the /audiomode command
 AUDIO_TRANSCRIPTION_DEFAULT_MODE=copy
 
+# ============================================================================
+# AI Assistant Arguments (Optional)
+# ============================================================================
+# Arguments to pass to the copilot command when starting a session
+# Default: --allow-all-tools --deny-tool 'shell(rmdir)' --deny-tool 'shell(rm)' --deny-tool 'shell(sudo)'
+COPILOT_ARGUMENTS=--allow-all-tools --deny-tool 'shell(rmdir)' --deny-tool 'shell(rm)' --deny-tool 'shell(sudo)'
+
+# Arguments to pass to the gemini command when starting a session
+GEMINI_ARGUMENTS=
+
+# Arguments to pass to the opencode command when starting a session
+OPENCODE_ARGUMENTS=
+
 #
 # CUSTOM ENV - not specific to coderBOT
 # Place here your custom environment variables if needed

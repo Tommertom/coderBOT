@@ -46,6 +46,11 @@ export class ConfigService {
     private readonly ttsApiKey: string | undefined;
     private readonly audioTranscriptionDefaultMode: 'copy' | 'prompt';
 
+    // AI Assistant Arguments
+    private readonly copilotArguments: string;
+    private readonly geminiArguments: string;
+    private readonly opencodeArguments: string;
+
     // Message Placeholders
     private readonly mPlaceholders: Map<number, string>;
 
@@ -117,10 +122,15 @@ export class ConfigService {
 
         // Load speech-to-text configuration
         this.ttsApiKey = process.env.TTS_API_KEY?.trim() || undefined;
-        
+
         // Load audio transcription default mode (default: 'copy')
         const audioModeValue = process.env.AUDIO_TRANSCRIPTION_DEFAULT_MODE?.toLowerCase();
         this.audioTranscriptionDefaultMode = audioModeValue === 'prompt' ? 'prompt' : 'copy';
+
+        // Load AI assistant arguments
+        this.copilotArguments = process.env.COPILOT_ARGUMENTS || '--allow-all-tools --deny-tool \'shell(rmdir)\' --deny-tool \'shell(rm)\' --deny-tool \'shell(sudo)\'';
+        this.geminiArguments = process.env.GEMINI_ARGUMENTS || '';
+        this.opencodeArguments = process.env.OPENCODE_ARGUMENTS || '';
 
         // Load message placeholders (M0-M9)
         this.mPlaceholders = new Map();
@@ -253,6 +263,19 @@ export class ConfigService {
         return this.audioTranscriptionDefaultMode;
     }
 
+    // AI Assistant Arguments Getters
+    getCopilotArguments(): string {
+        return this.copilotArguments;
+    }
+
+    getGeminiArguments(): string {
+        return this.geminiArguments;
+    }
+
+    getOpencodeArguments(): string {
+        return this.opencodeArguments;
+    }
+
     // Message Placeholder Getters
     getMPlaceholder(index: number): string | undefined {
         return this.mPlaceholders.get(index);
@@ -306,6 +329,9 @@ export class ConfigService {
   - Control Bot Admins: ${this.controlBotAdminIds.length}
   - Airplane Mode: ${this.airplaneMode}
   - TTS Enabled: ${this.hasTtsApiKey()}
-  - TTS Provider: ${this.detectTtsProvider() || 'none'}`;
+  - TTS Provider: ${this.detectTtsProvider() || 'none'}
+  - Copilot Arguments: "${this.copilotArguments}"
+  - Gemini Arguments: "${this.geminiArguments}"
+  - Opencode Arguments: "${this.opencodeArguments}"`;
     }
 }
