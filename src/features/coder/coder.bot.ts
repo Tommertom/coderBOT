@@ -92,7 +92,7 @@ export class CoderBot {
         bot.on('callback_query:data', AccessControlMiddleware.requireAccess, this.handleCallbackQuery.bind(this));
         bot.on('message:photo', AccessControlMiddleware.requireAccess, this.handlePhoto.bind(this));
         bot.on('message:video', AccessControlMiddleware.requireAccess, this.handleVideo.bind(this));
-        
+
         // Only register audio/voice handlers if audio transcription is NOT enabled
         // If audio transcription is enabled, the AudioBot will handle these messages instead
         if (!this.configService.hasTtsApiKey()) {
@@ -102,9 +102,9 @@ export class CoderBot {
         } else {
             console.log(`[${this.botId}] Audio/voice handlers skipped (AudioBot will handle transcription)`);
         }
-        
+
         bot.on('message:text', AccessControlMiddleware.requireAccess, this.handleTextMessage.bind(this));
-        
+
         // Load and register custom coders on startup
         this.loadAndRegisterAllCustomCoders();
     }
@@ -317,12 +317,12 @@ export class CoderBot {
                     this.mdFileCache.delete(userId);
                     return;
                 }
-                
+
                 try {
                     // Get the file path from cache using the index
                     const fileIndex = parseInt(fileData, 10);
                     const cachedFiles = this.mdFileCache.get(userId);
-                    
+
                     if (!cachedFiles || fileIndex < 0 || fileIndex >= cachedFiles.length) {
                         await this.safeAnswerCallbackQuery(ctx, `❌ File not found in cache`);
                         if (ctx.callbackQuery?.message) {
@@ -331,22 +331,22 @@ export class CoderBot {
                         this.mdFileCache.delete(userId);
                         return;
                     }
-                    
+
                     const filePath = cachedFiles[fileIndex];
                     const fileName = path.basename(filePath);
-                    
+
                     // Delete the menu message
                     if (ctx.callbackQuery?.message) {
                         await ctx.deleteMessage();
                     }
-                    
+
                     // Send the file as a document
                     await ctx.replyWithDocument(new InputFile(filePath), {
                         caption: `📄 ${fileName}`
                     });
-                    
+
                     await this.safeAnswerCallbackQuery(ctx, `✅ Sent: ${fileName}`);
-                    
+
                     // Clean up cache after successful send
                     this.mdFileCache.delete(userId);
                 } catch (error) {
@@ -923,12 +923,12 @@ export class CoderBot {
         // Create a handler that works like copilot/opencode/gemini
         const handler = async (ctx: Context) => {
             const currentUserId = ctx.from!.id.toString();
-            
+
             // Update last used timestamp
             if (this.customCoderService.hasCustomCoder(currentUserId, coderName)) {
                 this.customCoderService.updateLastUsed(currentUserId, coderName);
             }
-            
+
             // Spawn terminal session
             await this.handleAIAssistant(ctx, coderName);
         };
@@ -1162,7 +1162,7 @@ export class CoderBot {
     private async handleMacros(ctx: Context): Promise<void> {
         try {
             let message = '⚙️ *Message Placeholders*\n\n';
-            
+
             for (let i = 0; i <= 9; i++) {
                 const value = this.configService.getMPlaceholder(i);
                 const displayValue = value ? `\`${value}\`` : '_undefined_';
@@ -1189,22 +1189,22 @@ export class CoderBot {
                     console.warn(`Failed to get session CWD for user ${userId}, falling back to default:`, error);
                 }
             }
-            
+
             // Find all .md files recursively
             const findMdFiles = async (dir: string): Promise<Array<{ path: string; mtime: Date }>> => {
                 const results: Array<{ path: string; mtime: Date }> = [];
-                
+
                 const processDir = async (currentDir: string): Promise<void> => {
                     const entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
-                    
+
                     for (const entry of entries) {
                         const fullPath = path.join(currentDir, entry.name);
-                        
+
                         // Skip hidden directories and common ignore patterns
                         if (entry.name.startsWith('.') || entry.name === 'node_modules') {
                             continue;
                         }
-                        
+
                         if (entry.isDirectory()) {
                             await processDir(fullPath);
                         } else if (entry.isFile() && entry.name.endsWith('.md')) {
@@ -1213,13 +1213,13 @@ export class CoderBot {
                         }
                     }
                 };
-                
+
                 await processDir(dir);
                 return results;
             };
-            
+
             const mdFiles = await findMdFiles(cwd);
-            
+
             if (mdFiles.length === 0) {
                 const sentMsg = await ctx.reply(
                     '📄 *No Markdown Files Found*\n\n' +
@@ -1229,38 +1229,38 @@ export class CoderBot {
                 await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService);
                 return;
             }
-            
+
             // Sort by modification time (newest first) and take top 5
             const recentFiles = mdFiles
                 .sort((a, b) => b.mtime.getTime() - a.mtime.getTime())
                 .slice(0, 5);
-            
+
             // Store file paths in cache with user ID
             const filePaths = recentFiles.map(f => f.path);
             this.mdFileCache.set(userId, filePaths);
-            
+
             // Send debug log with working directory (permanent message)
             await ctx.reply(
                 `🔍 *Debug Info*\n\nWorking directory: \`${cwd}\``,
                 { parse_mode: 'Markdown' }
             );
-            
+
             const keyboard = new InlineKeyboard();
-            
+
             recentFiles.forEach((file, index) => {
                 const relativePath = path.relative(cwd, file.path);
                 // Replace backslashes with forward slashes for display
                 const normalizedPath = relativePath.replace(/\\/g, '/');
-                const displayName = normalizedPath.length > 40 
-                    ? '...' + normalizedPath.slice(-37) 
+                const displayName = normalizedPath.length > 40
+                    ? '...' + normalizedPath.slice(-37)
                     : normalizedPath;
                 const escapedDisplayName = TextSanitizationUtils.escapeMarkdown(displayName);
                 keyboard.text(escapedDisplayName, `md:${index}`);
                 keyboard.row();
             });
-            
+
             keyboard.text('❌ Cancel', 'md:cancel');
-            
+
             const sentMsg = await ctx.reply(
                 `📄 *Recent Markdown Files* (${recentFiles.length})\n\nSelect a file to view its content:`,
                 {
@@ -1268,7 +1268,7 @@ export class CoderBot {
                     reply_markup: keyboard
                 }
             );
-            
+
             await MessageUtils.scheduleMessageDeletion(ctx, sentMsg.message_id, this.configService, 3);
         } catch (error) {
             await ctx.reply(ErrorUtils.createErrorMessage(ErrorActions.SEND_TO_TERMINAL, error));

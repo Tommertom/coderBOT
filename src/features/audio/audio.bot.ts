@@ -13,6 +13,7 @@ import { XtermService } from '../xterm/xterm.service.js';
 import { AudioTranscriptionError, AudioErrorType, AudioProvider } from './audio.types.js';
 import { Messages, AudioErrors, ErrorActions } from '../../constants/messages.js';
 import { ErrorUtils } from '../../utils/error.utils.js';
+import { MessageUtils } from '../../utils/message.utils.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
@@ -259,10 +260,7 @@ export class AudioBot {
         text: string,
         provider: AudioProvider
     ): Promise<void> {
-        const providerName = provider === AudioProvider.OPENAI ? 'OpenAI Whisper' : 'Google Gemini';
-
-        const message = `🎙️ *Transcription* (via ${providerName}):\n\n\`\`\`\n${text}\n\`\`\`\n\n_You can now copy and use this text for your command._`;
-
+        const message = `🎙️ Transcription:\n\`${text}\``;
         await ctx.reply(message, { parse_mode: 'Markdown' });
     }
 
@@ -301,10 +299,12 @@ export class AudioBot {
                 ? '📋 *Copy Mode*: Transcribed text will be sent as a formatted message for you to copy and paste.'
                 : '🚀 *Prompt Mode*: Transcribed text will be directly sent to your active terminal session as a prompt.';
 
-            await ctx.reply(
+            const message = await ctx.reply(
                 `🎙️ Audio Transcription Mode Changed\n\n${modeDescription}\n\n_Use /audiomode again to toggle back._`,
                 { parse_mode: 'Markdown' }
             );
+
+            MessageUtils.scheduleMessageDeletion(ctx, message.message_id, this.configService);
         } catch (error) {
             console.error(`[${this.botId}] Error toggling audio mode:`, error);
             const errorMsg = error instanceof Error ? error.message : String(error);
