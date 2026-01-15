@@ -10,8 +10,18 @@ The Audio Transcription feature enables coderBOT to automatically convert voice 
 - **Audio File Support**: Transcribe uploaded audio files in various formats
 - **Multi-Provider Support**: Works with OpenAI Whisper and Google Gemini
 - **Auto-Detection**: Automatically detects which API to use based on key format
+- **Two Transcription Modes**: Copy-paste mode (default) or direct prompt mode
 - **Comprehensive Error Handling**: Clear error messages for common issues
-- **Easy Copy**: Transcribed text is formatted for easy copying
+
+## Transcription Modes
+
+### Copy Mode (Default)
+The transcribed text is returned as a formatted message that you can copy and paste. This is useful when you want to review the transcription before using it.
+
+### Prompt Mode
+The transcribed text is automatically sent to your active terminal session as a prompt, just like typing it manually. This is useful for quick voice commands to your AI assistant.
+
+**Toggle between modes** using the `/audiomode` command. Your preference is saved per user.
 
 ## Supported Audio Formats
 
@@ -74,22 +84,56 @@ npm run pm2:restart
 
 ## Usage
 
-### Sending Voice Messages
+### Switching Transcription Modes
+
+Use the `/audiomode` command to toggle between Copy and Prompt modes:
+
+```
+/audiomode
+```
+
+**Response in Copy Mode:**
+```
+🎙️ Audio Transcription Mode Changed
+
+🚀 Prompt Mode: Transcribed text will be directly sent to your active terminal session as a prompt.
+
+Use /audiomode again to toggle back.
+```
+
+**Response in Prompt Mode:**
+```
+🎙️ Audio Transcription Mode Changed
+
+📋 Copy Mode: Transcribed text will be sent as a formatted message for you to copy and paste.
+
+Use /audiomode again to toggle back.
+```
+
+### Sending Voice Messages (Copy Mode)
 
 1. Open your Telegram chat with coderBOT
 2. Record a voice message using Telegram's voice recorder
 3. Send the voice message
 4. Wait for the bot to process (you'll see "🎙️ Transcribing audio...")
-5. Receive the transcribed text in a code block
+5. Receive the transcribed text in a code block for copying
+
+### Sending Voice Messages (Prompt Mode)
+
+1. Make sure you have an active terminal session (`/copilot`, `/opencode`, or `/gemini`)
+2. Record and send a voice message
+3. Wait for transcription
+4. The transcribed text is automatically sent to your terminal as a prompt
 
 ### Sending Audio Files
 
 1. Upload an audio file to the chat (must be in a supported format)
 2. Wait for transcription
-3. Receive the transcribed text
+3. Depending on your mode setting, text is either returned for copying or sent as a prompt
 
-### Example Response
+### Example Responses
 
+**Copy Mode:**
 ```
 🎙️ Transcription (via OpenAI Whisper):
 
@@ -98,6 +142,11 @@ Hello, please run npm install and then start the development server.
 ```
 
 You can now copy and use this text for your command.
+```
+
+**Prompt Mode:**
+```
+✅ Transcribed text sent to terminal as prompt
 ```
 
 ## Error Messages

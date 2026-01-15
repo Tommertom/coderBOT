@@ -8,6 +8,8 @@
 import { Bot, Context } from 'grammy';
 import { AudioService } from './audio.service.js';
 import { ConfigService } from '../../services/config.service.js';
+import { AudioPreferencesService, AudioTranscriptionMode } from '../../services/audio-preferences.service.js';
+import { XtermService } from '../xterm/xterm.service.js';
 import { AudioTranscriptionError, AudioErrorType, AudioProvider } from './audio.types.js';
 import { Messages, AudioErrors, ErrorActions } from '../../constants/messages.js';
 import { ErrorUtils } from '../../utils/error.utils.js';
@@ -19,17 +21,23 @@ export class AudioBot {
     private bot: Bot | null = null;
     private audioService: AudioService;
     private configService: ConfigService;
+    private xtermService: XtermService;
+    private audioPreferencesService: AudioPreferencesService;
     private botId: string;
     private audioTmpPath: string;
 
     constructor(
         botId: string,
         audioService: AudioService,
-        configService: ConfigService
+        configService: ConfigService,
+        xtermService: XtermService,
+        audioPreferencesService: AudioPreferencesService
     ) {
         this.botId = botId;
         this.audioService = audioService;
         this.configService = configService;
+        this.xtermService = xtermService;
+        this.audioPreferencesService = audioPreferencesService;
 
         // Create bot-specific audio temp directory
         const baseMediaPath = configService.getMediaTmpLocation();
@@ -67,6 +75,11 @@ export class AudioBot {
         this.bot.on('message:audio', async (ctx) => {
             await this.handleAudioMessage(ctx, 'audio');
         });
+
+        // Handle audio mode toggle command
+        this.bot.command('audiomode', async (ctx) => {
+            await this.handleAudioModeToggle(ctx);
+        });
     }
 
     private async handleAudioMessage(ctx: Context, type: 'voice' | 'audio'): Promise<void> {
@@ -76,6 +89,8 @@ export class AudioBot {
                 await ctx.reply(AudioErrors.NO_API_KEY_CONFIGURED);
                 return;
             }
+
+            const userId = ctx.from!.id.toString();
 
             // Send processing message
             const processingMsg = await ctx.reply(Messages.TRANSCRIBING_AUDIO);
@@ -99,8 +114,16 @@ export class AudioBot {
                 // Delete processing message
                 await ctx.api.deleteMessage(ctx.chat.id, processingMsg.message_id);
 
-                // Send transcription result
-                await this.sendTranscriptionResult(ctx, result.text, result.provider);
+                // Get user's transcription mode preference
+                const mode = this.audioPreferencesService.getTranscriptionMode(userId);
+
+                if (mode === AudioTranscriptionMode.PROMPT) {
+                    // Direct prompt mode: send transcribed text to terminal
+                    await this.sendAsPrompt(ctx, result.text, userId);
+                } else {
+                    // Copy mode: send transcription result for copy-pasting
+                    await this.sendTranscriptionResult(ctx, result.text, result.provider);
+                }
 
             } catch (error) {
                 // Delete processing message
@@ -241,6 +264,54 @@ export class AudioBot {
         const message = `🎙️ *Transcription* (via ${providerName}):\n\n\`\`\`\n${text}\n\`\`\`\n\n_You can now copy and use this text for your command._`;
 
         await ctx.reply(message, { parse_mode: 'Markdown' });
+    }
+
+    private async sendAsPrompt(ctx: Context, text: string, userId: string): Promise<void> {
+        try {
+            // Check if user has an active terminal session
+            if (!this.xtermService.hasSession(userId)) {
+                await ctx.reply('❌ No active terminal session. Start a session first with /copilot, /opencode, or /gemini.');
+                return;
+            }
+
+            // Send transcribed text to terminal
+            this.xtermService.writeRawToSession(userId, text);
+
+            // Wait a moment then send enter
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            this.xtermService.writeRawToSession(userId, '\r');
+
+            await ctx.reply(`✅ Transcribed text sent to terminal as prompt`);
+
+        } catch (error) {
+            console.error(`[${this.botId}] Error sending transcription as prompt:`, error);
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            await ctx.reply(
+                ErrorUtils.createErrorMessage('send transcription to terminal', errorMsg)
+            );
+        }
+    }
+
+    private async handleAudioModeToggle(ctx: Context): Promise<void> {
+        try {
+            const userId = ctx.from!.id.toString();
+            const newMode = this.audioPreferencesService.toggleTranscriptionMode(userId);
+
+            const modeDescription = newMode === AudioTranscriptionMode.COPY
+                ? '📋 *Copy Mode*: Transcribed text will be sent as a formatted message for you to copy and paste.'
+                : '🚀 *Prompt Mode*: Transcribed text will be directly sent to your active terminal session as a prompt.';
+
+            await ctx.reply(
+                `🎙️ Audio Transcription Mode Changed\n\n${modeDescription}\n\n_Use /audiomode again to toggle back._`,
+                { parse_mode: 'Markdown' }
+            );
+        } catch (error) {
+            console.error(`[${this.botId}] Error toggling audio mode:`, error);
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            await ctx.reply(
+                ErrorUtils.createErrorMessage('toggle audio mode', errorMsg)
+            );
+        }
     }
 
     private async handleTranscriptionError(

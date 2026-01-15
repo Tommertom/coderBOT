@@ -106,7 +106,13 @@ async function startWorker() {
         // Initialize audio bot if STT is configured
         if (configService.hasTtsApiKey()) {
             const audioService = new AudioService(configService);
-            audioBot = new AudioBot(botId, audioService, configService);
+            audioBot = new AudioBot(
+                botId, 
+                audioService, 
+                configService, 
+                services.xtermService,
+                services.audioPreferencesService
+            );
             await audioBot.initialize(bot);
             console.log(`[Worker ${botId}] Audio transcription initialized (Provider: ${configService.detectTtsProvider()})`);
         } else {
