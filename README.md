@@ -77,7 +77,7 @@ coderbot
 
 - 🖥️ **Interactive Terminal**: Full xterm terminal access via Telegram with PTY support
 - 🤖 **AI Coding Assistant Support**: Native integration with GitHub Copilot CLI, OpenCode, Google Gemini, or any command-line AI tool
-- 🎙️ **Audio Transcription**: Convert voice messages and audio files to text using OpenAI Whisper or Google Gemini (optional, see [Audio Transcription docs](docs/audio-transcription-feature.md))
+- 🎙️ **Voice Coding**: Convert voice messages to text and code using your voice with OpenAI Whisper or Google Gemini transcription (optional)
 - 🔐 **Robust Access Control**: Environment-based user authentication with optional auto-kill on unauthorized access
 - 📸 **Terminal Screenshots**: Real-time visual feedback with terminal screen captures using Puppeteer
 - 🔄 **Auto-Refresh**: Configurable automatic screen refreshes after commands with per-user on/off control
@@ -198,6 +198,14 @@ M6=
 M7=
 M8=
 M9=
+
+# Audio Transcription (Optional)
+# Enable voice coding by configuring one of these API keys
+# Option 1: OpenAI Whisper (recommended for high accuracy)
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Option 2: Google Gemini (alternative transcription service)
+GOOGLE_GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 **Finding Your Telegram User ID:**
@@ -241,7 +249,86 @@ TELEGRAM_BOT_TOKENS=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz,0987654321:XYZabcDEFgh
 3. Both sessions run independently without interference
 4. If Bot 1 crashes, Bot 2 continues running and Bot 1 auto-restarts
 
-## Getting Started
+## Voice Coding
+
+CoderBot supports **hands-free coding with voice messages**, allowing you to interact with AI coding assistants using speech. This feature uses audio transcription powered by OpenAI Whisper or Google Gemini.
+
+### Setup
+
+To enable voice coding, configure one of these API keys in your `.env` file:
+
+```env
+# Option 1: OpenAI Whisper (recommended for accuracy)
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Option 2: Google Gemini (alternative)
+GOOGLE_GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+### How to Use Voice Coding
+
+**1. Start an AI assistant session:**
+```
+/copilot
+# or /opencode, /gemini, /xterm
+```
+
+**2. Choose your transcription mode:**
+```
+/audiomode
+```
+
+Two modes are available:
+
+- **📋 Copy Mode** (default): Transcribed text is sent as a formatted message that you can review and manually copy/paste
+- **🚀 Prompt Mode**: Transcribed text is automatically sent to your active terminal session as a command/prompt
+
+**3. Send voice messages:**
+- Record and send a voice message in Telegram
+- The bot transcribes your speech to text
+- Depending on mode:
+  - **Copy Mode**: You receive the transcription to review/edit
+  - **Prompt Mode**: Text is immediately sent to terminal
+
+### Voice Coding Examples
+
+**Prompt Mode workflow:**
+```
+You: /copilot
+Bot: [Starts Copilot session]
+
+You: /audiomode
+Bot: 🚀 Prompt Mode: Transcribed text will be directly sent to terminal
+
+You: [Voice: "Create a TypeScript function to validate email addresses"]
+Bot: ✅ Transcribed text sent to terminal as prompt
+Bot: [Copilot responds with generated code]
+```
+
+**Copy Mode workflow:**
+```
+You: [Voice: "How do I fix this merge conflict?"]
+Bot: 🎙️ Transcription:
+     `How do I fix this merge conflict?`
+
+You: [Reviews transcription, then copies and edits if needed]
+```
+
+### Voice Coding Tips
+
+- **Speak clearly** for better transcription accuracy
+- **Use Copy Mode** when you want to review/edit before sending
+- **Use Prompt Mode** for faster, hands-free interaction
+- **Toggle anytime** with `/audiomode` to switch between modes
+- Works with **all AI assistants** (Copilot, OpenCode, Gemini)
+- Supports both **voice messages** and **audio files**
+
+### Supported Audio Formats
+
+- Voice messages (Telegram native format)
+- Audio files: MP3, WAV, OGG, M4A, FLAC, AAC
+
+
 
 ### Installation Methods
 
@@ -293,6 +380,12 @@ docker compose down
 - `/xterm` - Start raw bash terminal session (no AI assistant)
 - `/close` - Close the active terminal session
 - `/help` - Show complete command reference
+
+### Voice Coding
+- **Send voice messages** - Convert speech to text and use for coding (requires audio transcription setup)
+- `/audiomode` - Toggle between two transcription modes:
+  - **📋 Copy Mode** (default): Transcribed text sent as message for copy/paste
+  - **🚀 Prompt Mode**: Transcribed text automatically sent to terminal as command
 
 ### Sending Text to Terminal
 - **Regular text messages** - Sent directly to terminal with Enter
