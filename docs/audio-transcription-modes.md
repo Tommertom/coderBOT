@@ -6,6 +6,21 @@ Added a new feature that allows users to choose how transcribed audio is handled
 - **Copy Mode (default)**: Transcribed text is returned as a formatted message for copy-pasting
 - **Prompt Mode**: Transcribed text is directly sent to the active terminal session as a prompt
 
+Users can override the default mode using the `/audiomode` command.
+
+## Configuration
+
+### Environment Variable
+
+Add to `.env` file:
+
+```env
+# Default audio transcription mode (optional, default: copy)
+AUDIO_TRANSCRIPTION_DEFAULT_MODE=copy  # or 'prompt'
+```
+
+This sets the default mode for all users. Individual users can override this with `/audiomode`.
+
 ## Implementation Details
 
 ### New Files Created
@@ -15,20 +30,34 @@ Added a new feature that allows users to choose how transcribed audio is handled
    - Stores user preferences in memory (Map-based)
    - Provides methods to get, set, toggle, and clear preferences
    - Defines `AudioTranscriptionMode` enum with two modes: COPY and PROMPT
+   - Uses ConfigService to get default mode from environment
 
 ### Modified Files
 
-1. **`src/services/service-container.factory.ts`**
+1. **`src/services/config.service.ts`**
+   - Added `audioTranscriptionDefaultMode` property
+   - Added `getAudioTranscriptionDefaultMode()` method
+   - Reads `AUDIO_TRANSCRIPTION_DEFAULT_MODE` from .env (defaults to 'copy')
+
+2. **`dot-env.template`**
+   - Added `AUDIO_TRANSCRIPTION_DEFAULT_MODE` configuration option
+   - Documented both 'copy' and 'prompt' values
+
+3. **`.env`**
+   - Added `AUDIO_TRANSCRIPTION_DEFAULT_MODE=copy` setting
+
+4. **`src/services/service-container.factory.ts`**
    - Added `AudioPreferencesService` as a global singleton service
+   - Passes ConfigService to AudioPreferencesService constructor
    - Injected into service container for all bots
 
-2. **`src/services/service-container.interface.ts`**
+5. **`src/services/service-container.interface.ts`**
    - Updated interface to include `audioPreferencesService` property
 
-3. **`src/bot-worker.ts`**
+6. **`src/bot-worker.ts`**
    - Updated AudioBot instantiation to include `xtermService` and `audioPreferencesService`
 
-4. **`src/features/audio/audio.bot.ts`**
+7. **`src/features/audio/audio.bot.ts`**
    - Added constructor parameters for `xtermService` and `audioPreferencesService`
    - Registered new `/audiomode` command handler
    - Modified `handleAudioMessage` to check user's transcription mode preference
@@ -36,16 +65,18 @@ Added a new feature that allows users to choose how transcribed audio is handled
    - Added `handleAudioModeToggle` method to toggle between modes
    - Updated imports to include new service and types
 
-5. **`docs/audio-transcription-feature.md`**
+8. **`docs/audio-transcription-feature.md`**
    - Updated documentation to explain both transcription modes
    - Added usage instructions for `/audiomode` command
    - Added example responses for both modes
+   - Documented the new .env setting
 
 ## User Experience
 
 ### Default Behavior
-- All users start in **Copy Mode** by default
-- Transcribed text is displayed in a formatted message for easy copying
+- All users start with the mode configured in `AUDIO_TRANSCRIPTION_DEFAULT_MODE` (default: 'copy')
+- Users can override this at any time with `/audiomode`
+- Transcribed text behavior depends on the active mode
 
 ### Toggle Command
 Users can switch modes at any time using:

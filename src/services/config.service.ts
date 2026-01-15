@@ -44,6 +44,7 @@ export class ConfigService {
 
     // Speech-to-Text Configuration
     private readonly ttsApiKey: string | undefined;
+    private readonly audioTranscriptionDefaultMode: 'copy' | 'prompt';
 
     // Message Placeholders
     private readonly mPlaceholders: Map<number, string>;
@@ -116,6 +117,10 @@ export class ConfigService {
 
         // Load speech-to-text configuration
         this.ttsApiKey = process.env.TTS_API_KEY?.trim() || undefined;
+        
+        // Load audio transcription default mode (default: 'copy')
+        const audioModeValue = process.env.AUDIO_TRANSCRIPTION_DEFAULT_MODE?.toLowerCase();
+        this.audioTranscriptionDefaultMode = audioModeValue === 'prompt' ? 'prompt' : 'copy';
 
         // Load message placeholders (M0-M9)
         this.mPlaceholders = new Map();
@@ -242,6 +247,10 @@ export class ConfigService {
         // Gemini keys typically start with "AIza" or are alphanumeric
         // If it doesn't match OpenAI pattern, assume Gemini
         return 'gemini';
+    }
+
+    getAudioTranscriptionDefaultMode(): 'copy' | 'prompt' {
+        return this.audioTranscriptionDefaultMode;
     }
 
     // Message Placeholder Getters

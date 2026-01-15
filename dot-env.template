@@ -120,6 +120,12 @@ M9=
 # Gemini example: TTS_API_KEY=AIzaSy...
 TTS_API_KEY=
 
+# Default audio transcription mode (copy/prompt)
+# copy: Transcribed text is returned as a formatted message for copy-pasting (default)
+# prompt: Transcribed text is directly sent to active terminal session as a prompt
+# Users can override this with the /audiomode command
+AUDIO_TRANSCRIPTION_DEFAULT_MODE=copy
+
 #
 # CUSTOM ENV - not specific to coderBOT
 # Place here your custom environment variables if needed

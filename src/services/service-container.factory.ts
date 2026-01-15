@@ -26,7 +26,7 @@ export class ServiceContainerFactory {
 
         // Create or reuse the global audio preferences service (shared across all bots)
         if (!ServiceContainerFactory.globalAudioPreferences) {
-            ServiceContainerFactory.globalAudioPreferences = new AudioPreferencesService();
+            ServiceContainerFactory.globalAudioPreferences = new AudioPreferencesService(configService);
         }
         const audioPreferencesService = ServiceContainerFactory.globalAudioPreferences;
 
@@ -64,7 +64,10 @@ export class ServiceContainerFactory {
 
     static getGlobalAudioPreferences(): AudioPreferencesService {
         if (!ServiceContainerFactory.globalAudioPreferences) {
-            ServiceContainerFactory.globalAudioPreferences = new AudioPreferencesService();
+            if (!ServiceContainerFactory.globalConfig) {
+                ServiceContainerFactory.globalConfig = new ConfigService();
+            }
+            ServiceContainerFactory.globalAudioPreferences = new AudioPreferencesService(ServiceContainerFactory.globalConfig);
         }
         return ServiceContainerFactory.globalAudioPreferences;
     }

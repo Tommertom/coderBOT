@@ -52,7 +52,7 @@ You need an API key from either OpenAI or Google Gemini:
 3. Create a new API key
 4. Copy the key (typically starts with `AIza`)
 
-### 2. Configure Environment Variable
+### 2. Configure Environment Variables
 
 Add your API key to the `.env` file:
 
@@ -62,11 +62,18 @@ TTS_API_KEY=sk-proj-abcd1234...
 
 # OR Google Gemini API
 TTS_API_KEY=AIzaSy...
+
+# Default audio transcription mode (optional, default: copy)
+# copy: Transcribed text is returned for copy-pasting
+# prompt: Transcribed text is sent directly to terminal
+AUDIO_TRANSCRIPTION_DEFAULT_MODE=copy
 ```
 
 The bot will automatically detect which service to use based on the key format:
 - Keys starting with `sk-` → OpenAI Whisper
 - Other formats → Google Gemini
+
+The default mode applies to all users until they override it with `/audiomode`.
 
 ### 3. Restart the Bot
 
