@@ -85,6 +85,6 @@ users/
 # Custom coder configurations (user-specific)
 customcoders/
 
-core
+core*
 
 .env*
